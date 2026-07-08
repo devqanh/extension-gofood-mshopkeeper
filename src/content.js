@@ -1692,7 +1692,7 @@
       return receivableAmount;
     }
 
-    var text = scope && scope.innerText ? scope.innerText || "" : (document.body ? document.body.innerText || "" : "");
+    var text = getTextExcludingQrPanel(scope || document.body);
     var candidates = [];
     var regexes = [
       /(?:con\s*phai\s*thu|tong\s*(?:cong|tien)|thanh\s*toan|phai\s*tra)[^\d]{0,50}((?:\d{1,3}[.,])+\d{3}|\d{4,})\s*(?:d|vnd|₫)?/gi,
@@ -1704,7 +1704,7 @@
       var match = regex.exec(normalized);
       while (match) {
         var amount = normalizeAmount(match[1]);
-        if (amount && Number(amount) >= 1000 && Number(amount) <= 9999999999999) {
+        if (isValidQrAmount(amount)) {
           candidates.push(Number(amount));
         }
         match = regex.exec(normalized);
@@ -1724,7 +1724,7 @@
 
     for (var i = 0; i < possibleLabels.length; i += 1) {
       var element = possibleLabels[i];
-      if (!isVisible(element)) {
+      if (!isVisible(element) || isInsideQrPanel(element)) {
         continue;
       }
 
@@ -1742,16 +1742,17 @@
     var rows = Array.prototype.slice.call(root.querySelectorAll(".row, .misa-div, div"));
     for (var rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
       var row = rows[rowIndex];
-      if (!isVisible(row)) {
+      if (!isVisible(row) || isInsideQrPanel(row)) {
         continue;
       }
 
-      var rowText = normalizeText(row.textContent);
+      var rawRowText = getTextExcludingQrPanel(row);
+      var rowText = normalizeText(rawRowText);
       if (rowText.indexOf("con phai thu") < 0 || rowText.length > 120) {
         continue;
       }
 
-      var rowAmount = extractLikelyAmountFromText(row.textContent);
+      var rowAmount = extractLikelyAmountFromText(rawRowText);
       if (rowAmount) {
         return rowAmount;
       }
@@ -1762,31 +1763,60 @@
 
   function getNearbyAmountText(labelElement) {
     var chunks = [];
+    var row = labelElement.closest(".row") || labelElement.parentElement;
     var next = labelElement.nextElementSibling;
     var previous = labelElement.previousElementSibling;
 
-    if (next) {
-      chunks.push(next.textContent || "");
+    if (row && !isInsideQrPanel(row)) {
+      Array.prototype.slice.call(row.querySelectorAll(".fs-money")).forEach(function (moneyElement) {
+        chunks.push(getTextExcludingQrPanel(moneyElement));
+      });
     }
-    if (previous) {
-      chunks.push(previous.textContent || "");
+
+    if (next && !isInsideQrPanel(next)) {
+      chunks.push(getTextExcludingQrPanel(next));
+    }
+    if (previous && !isInsideQrPanel(previous)) {
+      chunks.push(getTextExcludingQrPanel(previous));
     }
 
     if (labelElement.parentElement) {
-      chunks.push(labelElement.parentElement.textContent || "");
+      chunks.push(getTextExcludingQrPanel(labelElement.parentElement));
       Array.prototype.slice.call(labelElement.parentElement.children).forEach(function (child) {
-        if (child !== labelElement) {
-          chunks.push(child.textContent || "");
+        if (child !== labelElement && !isInsideQrPanel(child)) {
+          chunks.push(getTextExcludingQrPanel(child));
         }
       });
     }
 
-    var row = labelElement.closest(".row");
-    if (row) {
-      chunks.push(row.textContent || "");
+    if (row && !isInsideQrPanel(row)) {
+      chunks.push(getTextExcludingQrPanel(row));
     }
 
     return chunks.join(" ");
+  }
+
+  function getTextExcludingQrPanel(root) {
+    var element = root;
+    if (!element) {
+      element = document.body;
+    }
+    if (element && element.nodeType === Node.DOCUMENT_NODE) {
+      element = element.body || document.body;
+    }
+    if (!element || element.nodeType !== Node.ELEMENT_NODE || isInsideQrPanel(element)) {
+      return "";
+    }
+
+    var clone = element.cloneNode(true);
+    Array.prototype.slice.call(clone.querySelectorAll("." + PANEL_CLASS)).forEach(function (panel) {
+      panel.remove();
+    });
+    return clone.innerText || clone.textContent || "";
+  }
+
+  function isInsideQrPanel(element) {
+    return element instanceof Element && Boolean(element.closest("." + PANEL_CLASS));
   }
 
   function extractLikelyAmountFromText(text) {
@@ -1794,7 +1824,7 @@
     var candidates = matches.map(function (match) {
       return normalizeAmount(match);
     }).filter(function (amount) {
-      return amount && Number(amount) >= 1000 && Number(amount) <= 9999999999999;
+      return isValidQrAmount(amount);
     });
 
     if (!candidates.length) {
@@ -1802,6 +1832,11 @@
     }
 
     return String(Math.max.apply(Math, candidates.map(Number)));
+  }
+
+  function isValidQrAmount(amount) {
+    var value = Number(amount);
+    return amount && value >= 1000 && value <= 99999999999;
   }
 
   function normalizeText(value) {

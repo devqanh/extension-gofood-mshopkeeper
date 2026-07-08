@@ -17,14 +17,12 @@
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
-    elements.apiBaseUrl = document.getElementById("api-base-url");
     elements.loadApi = document.getElementById("load-api");
     elements.save = document.getElementById("save");
     elements.bankSelect = document.getElementById("bank-select");
     elements.bankInfo = document.getElementById("bank-info");
     elements.status = document.getElementById("status");
 
-    elements.apiBaseUrl.textContent = getApiBaseUrl();
     elements.loadApi.addEventListener("click", loadBranches);
     elements.save.addEventListener("click", saveSettings);
     elements.bankSelect.addEventListener("change", function () {
@@ -124,7 +122,7 @@
       emptyOption.textContent = "Chưa có chi nhánh";
       elements.bankSelect.appendChild(emptyOption);
       elements.bankSelect.disabled = true;
-      elements.bankInfo.textContent = "Bấm Tải chi nhánh để lấy dữ liệu từ " + getApiBaseUrl() + ".";
+      elements.bankInfo.textContent = "Bấm Tải chi nhánh để lấy danh sách chi nhánh nhận tiền.";
       return;
     }
 

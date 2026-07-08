@@ -111,6 +111,14 @@ GET /invoice-refs.php?page=1&perPage=20&q=GOFOOD260708154412
 
 Popup extension cũng có khung `RefNo đã lưu` để tải nhanh danh sách này.
 
+Tạm thời extension đang gửi JSON bắt được lên Webhook.site bằng background service worker để tránh lỗi CORS/preflight:
+
+```text
+POST https://webhook.site/c2a8e0a2-afb7-4423-83f0-27c5a7c2c97a
+```
+
+Payload gồm `refNo`, `transferNote`, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt và thời điểm post.
+
 ## Ghi chú VietQR
 
 Quick Link đang được tạo theo mẫu:

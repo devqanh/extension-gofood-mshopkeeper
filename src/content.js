@@ -7,6 +7,7 @@
   var PAGE_HOOK_SCRIPT = "src/page-hook.js";
   var PAGE_HOOK_SOURCE = "gofood-vietqr-page-hook";
   var SAVE_SYNC_MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
+  var INVOICE_REF_WEBHOOK_URL = "https://webhook.site/c2a8e0a2-afb7-4423-83f0-27c5a7c2c97a";
 
   var state = {
     config: null,
@@ -98,7 +99,7 @@
 
     state.lastSaveSyncResponse = response;
     attachSaveSyncResponseToPanel(response);
-    sendInvoiceRefToApi(response);
+    sendInvoiceRefToWebhook(response);
     storageSet("local", {
       lastSaveSyncResponse: response
     });
@@ -167,8 +168,8 @@
     }
   }
 
-  function sendInvoiceRefToApi(response) {
-    var endpoint = getInvoiceRefsEndpoint();
+  function sendInvoiceRefToWebhook(response) {
+    var endpoint = INVOICE_REF_WEBHOOK_URL;
     var transferNote = detectCurrentTransferNote();
 
     if (!response.refNo || !transferNote || !endpoint) {
@@ -178,7 +179,7 @@
       return;
     }
 
-    var amount = detectCurrentAmount();
+    var paymentSnapshot = buildPaymentSnapshot();
     var selectedBank = getSelectedBank();
     var saveKey = response.refNo + "|" + transferNote;
 
@@ -189,14 +190,27 @@
     state.lastInvoiceRefSaveKey = saveKey;
 
     var payload = {
+      event: "mshopkeeper.save_sync",
+      id: response.refNo,
       refNo: response.refNo,
       transferNote: transferNote,
-      amount: amount,
-      amountText: amount ? formatAmount(amount) : "",
+      receivableAmount: paymentSnapshot.receivableAmount,
+      receivableAmountText: paymentSnapshot.receivableAmountText,
+      bankTransferAmount: paymentSnapshot.bankTransferAmount,
+      bankTransferAmountText: paymentSnapshot.bankTransferAmountText,
+      cashAmount: paymentSnapshot.cashAmount,
+      cashAmountText: paymentSnapshot.cashAmountText,
+      paymentTotal: paymentSnapshot.paymentTotal,
+      paymentTotalText: paymentSnapshot.paymentTotalText,
+      paymentMethods: paymentSnapshot.paymentMethods,
+      paymentsByType: paymentSnapshot.paymentsByType,
       bankId: selectedBank ? selectedBank.bankId : "",
       bankAccountNo: selectedBank ? selectedBank.accountNo : "",
       bankAccountName: selectedBank ? selectedBank.accountName : "",
       sourceUrl: window.location.href,
+      sourceHost: window.location.host,
+      sourcePath: window.location.pathname,
+      postedAt: buildPostDateInfo(new Date()),
       saveSyncStatus: response.status,
       saveSyncSuccess: response.success,
       saveSyncResponse: {
@@ -207,30 +221,23 @@
       capturedAt: response.capturedAt
     };
 
-    fetch(endpoint, {
-      method: "POST",
-      cache: "no-store",
-      credentials: "omit",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    }).then(function (apiResponse) {
-      if (!apiResponse.ok) {
-        throw new Error("API lưu RefNo trả về HTTP " + apiResponse.status + ".");
-      }
-      return apiResponse.json();
-    }).then(function (json) {
-      if (!json || json.ok === false) {
-        throw new Error(json && json.error ? json.error : "API không lưu được RefNo.");
+    postWebhookPayload(endpoint, payload).then(function (result) {
+      if (!result || result.ok === false) {
+        throw new Error(result && result.error ? result.error : "Webhook không nhận dữ liệu.");
       }
 
+      if (result.status && result.status >= 400) {
+        throw new Error("Webhook trả về HTTP " + result.status + ".");
+      }
+
+      return result;
+    }).then(function () {
       storageSet("local", {
-        lastInvoiceRefMapping: json.item || payload
+        lastInvoiceRefMapping: payload
       });
 
       if (state.elements.status) {
-        setStatus("Đã lưu RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
+        setStatus("Đã gửi webhook RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
       }
     }).catch(function (error) {
       state.lastInvoiceRefSaveKey = "";
@@ -238,33 +245,64 @@
         setStatus(error.message, "error");
       }
       if (window.console && typeof window.console.warn === "function") {
-        window.console.warn("[GoFood VietQR] Không lưu được RefNo:", error);
+        window.console.warn("[GoFood VietQR] Không gửi được webhook RefNo:", error);
       }
     });
   }
 
-  function getInvoiceRefsEndpoint() {
-    var endpoints = state.config && state.config.endpoints ? state.config.endpoints : {};
-    var configured = endpoints.invoiceRefs || endpoints.invoice_refs || endpoints.saveRef || endpoints.save_ref;
-    var apiUrl = state.settings && state.settings.apiUrl ? state.settings.apiUrl : "";
+  function postWebhookPayload(endpoint, payload) {
+    if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+      return new Promise(function (resolve) {
+        chrome.runtime.sendMessage({
+          type: "GOFOOD_VIETQR_POST_WEBHOOK",
+          endpoint: endpoint,
+          payload: payload
+        }, function (response) {
+          if (chrome.runtime.lastError) {
+            resolve({
+              ok: false,
+              error: chrome.runtime.lastError.message || "Không gửi được message tới background."
+            });
+            return;
+          }
 
-    if (configured) {
-      try {
-        return new URL(String(configured), apiUrl || window.location.href).toString();
-      } catch (error) {
-        return String(configured);
-      }
+          resolve(response || {
+            ok: false,
+            error: "Background không trả phản hồi."
+          });
+        });
+      }).then(function (result) {
+        if (result && result.ok !== false) {
+          return result;
+        }
+
+        return postWebhookPayloadNoCors(endpoint, payload).then(function (fallbackResult) {
+          fallbackResult.backgroundError = result ? result.error : "";
+          return fallbackResult;
+        });
+      });
     }
 
-    if (!apiUrl) {
-      return "";
-    }
+    return postWebhookPayloadNoCors(endpoint, payload);
+  }
 
-    try {
-      return new URL("invoice-refs.php", apiUrl).toString();
-    } catch (error) {
-      return "";
-    }
+  function postWebhookPayloadNoCors(endpoint, payload) {
+    return fetch(endpoint, {
+      method: "POST",
+      mode: "no-cors",
+      cache: "no-store",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8"
+      },
+      body: JSON.stringify(payload)
+    }).then(function () {
+      return {
+        ok: true,
+        status: 0,
+        noCors: true
+      };
+    });
   }
 
   function detectCurrentTransferNote() {
@@ -311,6 +349,195 @@
     }
 
     return detectAmountFromPage();
+  }
+
+  function buildPaymentSnapshot() {
+    var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true }) || document;
+    var receivableAmount = detectReceivableAmountFromPage(scope) || detectCurrentAmount();
+    var paymentMethods = detectPaymentMethods(scope);
+    var summary = summarizePaymentMethods(paymentMethods);
+
+    return {
+      receivableAmount: receivableAmount,
+      receivableAmountText: receivableAmount ? formatAmount(receivableAmount) : "",
+      bankTransferAmount: summary.bankTransferAmount,
+      bankTransferAmountText: summary.bankTransferAmount ? formatAmount(summary.bankTransferAmount) : "",
+      cashAmount: summary.cashAmount,
+      cashAmountText: summary.cashAmount ? formatAmount(summary.cashAmount) : "",
+      paymentTotal: summary.paymentTotal,
+      paymentTotalText: summary.paymentTotal ? formatAmount(summary.paymentTotal) : "",
+      paymentMethods: paymentMethods,
+      paymentsByType: summary.paymentsByType
+    };
+  }
+
+  function detectPaymentMethods(scope) {
+    var root = scope || document;
+    var wrappers = Array.prototype.slice.call(root.querySelectorAll(".type-payment-wrap"))
+      .filter(isVisible);
+
+    if (!wrappers.length && root !== document) {
+      wrappers = Array.prototype.slice.call(document.querySelectorAll(".type-payment-wrap"))
+        .filter(isVisible);
+    }
+
+    if (!wrappers.length) {
+      return [];
+    }
+
+    wrappers.sort(function (a, b) {
+      return visibleScore(b) - visibleScore(a);
+    });
+
+    var items = Array.prototype.slice.call(wrappers[0].querySelectorAll(".type-payment-item"))
+      .filter(isVisible);
+
+    return items.map(function (item, index) {
+      var method = extractPaymentMethodName(item);
+      var rawAmount = extractPaymentMethodAmount(item);
+      var amount = normalizeAmount(rawAmount);
+      var type = classifyPaymentMethod(method);
+
+      return {
+        index: index + 1,
+        method: method,
+        type: type,
+        amount: amount,
+        amountText: amount ? formatAmount(amount) : "",
+        rawAmount: rawAmount
+      };
+    }).filter(function (item) {
+      return item.method || item.amount || item.rawAmount;
+    });
+  }
+
+  function extractPaymentMethodName(item) {
+    var selectors = [
+      '.filter-select .q-field__native[placeholder*="Phương thức"] span',
+      '.q-select .q-field__native[placeholder*="Phương thức"] span',
+      '.q-field__native[placeholder*="Phương thức"] span',
+      ".filter-select .q-field__native span",
+      ".q-select .q-field__native span"
+    ];
+
+    for (var i = 0; i < selectors.length; i += 1) {
+      var element = item.querySelector(selectors[i]);
+      var text = element ? String(element.textContent || "").trim() : "";
+      if (text) {
+        return text;
+      }
+    }
+
+    return "";
+  }
+
+  function extractPaymentMethodAmount(item) {
+    var selectors = [
+      ".misa-input-money input",
+      ".input-text-right input",
+      "input.text-right",
+      'input[maxlength="14"]'
+    ];
+
+    for (var i = 0; i < selectors.length; i += 1) {
+      var input = item.querySelector(selectors[i]);
+      if (!input) {
+        continue;
+      }
+
+      var value = String(input.value || input.getAttribute("value") || "").trim();
+      if (value) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  function classifyPaymentMethod(method) {
+    var normalized = normalizeText(method);
+
+    if (normalized.indexOf("chuyen khoan") >= 0 || normalized.indexOf("ck") === 0 || normalized.indexOf("bank") >= 0) {
+      return "bank_transfer";
+    }
+
+    if (normalized.indexOf("tien mat") >= 0 || normalized.indexOf("cash") >= 0) {
+      return "cash";
+    }
+
+    if (normalized.indexOf("the") >= 0 || normalized.indexOf("card") >= 0) {
+      return "card";
+    }
+
+    return "other";
+  }
+
+  function summarizePaymentMethods(paymentMethods) {
+    var paymentsByType = {};
+
+    paymentMethods.forEach(function (item) {
+      var type = item.type || "other";
+      var amountNumber = Number(item.amount || 0);
+
+      if (!paymentsByType[type]) {
+        paymentsByType[type] = {
+          amount: "0",
+          amountText: "",
+          methods: []
+        };
+      }
+
+      paymentsByType[type].methods.push(item);
+      if (amountNumber > 0) {
+        paymentsByType[type].amount = String(Number(paymentsByType[type].amount || 0) + amountNumber);
+        paymentsByType[type].amountText = formatAmount(paymentsByType[type].amount);
+      }
+    });
+
+    var bankTransferAmount = paymentsByType.bank_transfer ? paymentsByType.bank_transfer.amount : "";
+    var cashAmount = paymentsByType.cash ? paymentsByType.cash.amount : "";
+    var paymentTotalNumber = paymentMethods.reduce(function (total, item) {
+      return total + Number(item.amount || 0);
+    }, 0);
+
+    return {
+      bankTransferAmount: bankTransferAmount && Number(bankTransferAmount) > 0 ? bankTransferAmount : "",
+      cashAmount: cashAmount && Number(cashAmount) > 0 ? cashAmount : "",
+      paymentTotal: paymentTotalNumber > 0 ? String(paymentTotalNumber) : "",
+      paymentsByType: paymentsByType
+    };
+  }
+
+  function buildPostDateInfo(date) {
+    var timezone = "";
+
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch (error) {
+      timezone = "";
+    }
+
+    return {
+      iso: date.toISOString(),
+      localDateTime: [
+        pad(date.getDate()),
+        pad(date.getMonth() + 1),
+        date.getFullYear()
+      ].join("/") + " " + [
+        pad(date.getHours()),
+        pad(date.getMinutes()),
+        pad(date.getSeconds())
+      ].join(":"),
+      localDate: [pad(date.getDate()), pad(date.getMonth() + 1), date.getFullYear()].join("/"),
+      localTime: [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join(":"),
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+      timezone: timezone
+    };
   }
 
   function bindOrderChangeCleanup() {

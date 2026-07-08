@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GoFood VietQR</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="header">
+        <h1>GoFood VietQR</h1>
+        <p>Chọn endpoint PHP và tài khoản ngân hàng mặc định.</p>
+      </header>
+
+      <label class="field">
+        <span>API URL PHP</span>
+        <input id="api-url" type="url" placeholder="https://ten-mien-cua-ban.vn/gofood-vietqr/banks.php" />
+      </label>
+
+      <div class="button-row">
+        <button id="load-api" class="button" type="button">Tải API</button>
+        <button id="save" class="button secondary" type="button">Lưu</button>
+      </div>
+
+      <label class="field">
+        <span>Ngân hàng mặc định</span>
+        <select id="bank-select"></select>
+      </label>
+
+      <div id="bank-info" class="bank-info">Chưa có dữ liệu ngân hàng.</div>
+      <div id="status" class="status" role="status"></div>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

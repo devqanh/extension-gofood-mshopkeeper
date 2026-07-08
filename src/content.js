@@ -4,6 +4,9 @@
   var PANEL_CLASS = "gofood-vietqr-panel";
   var BUTTON_ID = "gofood-vietqr-button";
   var DEFAULT_TEMPLATE = "compact2";
+  var PAGE_HOOK_SCRIPT = "src/page-hook.js";
+  var PAGE_HOOK_SOURCE = "gofood-vietqr-page-hook";
+  var SAVE_SYNC_MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
 
   var state = {
     config: null,
@@ -17,6 +20,7 @@
     autoNoteObserver: null,
     generatedNoteCodes: {},
     lastNoteEpochSecond: 0,
+    lastSaveSyncResponse: null,
     elements: {}
   };
 
@@ -28,6 +32,8 @@
   init();
 
   function init() {
+    injectPageNetworkHook();
+    bindSaveSyncResponseCapture();
     bindOrderChangeCleanup();
     bindAutoNoteGeneration();
     loadState().then(function () {
@@ -46,6 +52,116 @@
           }
         });
       });
+    }
+  }
+
+  function injectPageNetworkHook() {
+    if (!chrome || !chrome.runtime || !chrome.runtime.getURL) {
+      return;
+    }
+
+    var root = document.documentElement;
+    if (!root || root.dataset.gvqNetworkHookInjected) {
+      return;
+    }
+
+    root.dataset.gvqNetworkHookInjected = "true";
+
+    var script = document.createElement("script");
+    script.src = chrome.runtime.getURL(PAGE_HOOK_SCRIPT);
+    script.async = false;
+    script.onload = function () {
+      script.remove();
+    };
+
+    (document.head || root).appendChild(script);
+  }
+
+  function bindSaveSyncResponseCapture() {
+    window.addEventListener("message", function (event) {
+      var data = event.data || {};
+
+      if (event.source !== window || data.source !== PAGE_HOOK_SOURCE || data.type !== SAVE_SYNC_MESSAGE_TYPE) {
+        return;
+      }
+
+      handleSaveSyncResponse(data.payload || {});
+    });
+  }
+
+  function handleSaveSyncResponse(payload) {
+    var response = normalizeSaveSyncResponse(payload);
+    if (!response) {
+      return;
+    }
+
+    state.lastSaveSyncResponse = response;
+    attachSaveSyncResponseToPanel(response);
+    storageSet("local", {
+      lastSaveSyncResponse: response
+    });
+
+    if (window.console && typeof window.console.info === "function") {
+      window.console.info("[GoFood VietQR] Bắt response save-sync:", response);
+    }
+  }
+
+  function normalizeSaveSyncResponse(payload) {
+    var json = payload.bodyJson && typeof payload.bodyJson === "object" ? payload.bodyJson : null;
+    var refNo = extractSaveSyncRefNo(json);
+
+    return {
+      capturedAt: payload.capturedAt || new Date().toISOString(),
+      source: payload.source || "",
+      method: payload.method || "",
+      url: payload.url || "",
+      status: Number(payload.status || 0),
+      ok: payload.ok !== false,
+      success: json ? json.Success === true || json.success === true : Boolean(payload.ok),
+      refNo: refNo,
+      code: json ? json.Code || json.code || null : null,
+      data: json ? json.Data || json.data || null : null,
+      bodyJson: json,
+      bodyText: String(payload.bodyText || "").slice(0, 4000)
+    };
+  }
+
+  function extractSaveSyncRefNo(json) {
+    if (!json || typeof json !== "object") {
+      return "";
+    }
+
+    var data = json.Data || json.data || {};
+    return String(data.RefNo || data.refNo || data.ref_no || "").trim();
+  }
+
+  function attachSaveSyncResponseToPanel(response) {
+    var panel = state.elements.panel;
+
+    if (!panel || !panel.isConnected) {
+      var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true });
+      panel = scope ? scope.querySelector(":scope > ." + PANEL_CLASS) : null;
+    }
+
+    if (!panel) {
+      return;
+    }
+
+    panel.dataset.gvqSaveStatus = String(response.status || "");
+    panel.dataset.gvqSaveSuccess = response.success ? "true" : "false";
+    panel.dataset.gvqSaveCapturedAt = response.capturedAt;
+
+    if (response.refNo) {
+      panel.dataset.gvqSaveRefNo = response.refNo;
+    }
+
+    if (state.elements.status) {
+      setStatus(
+        response.refNo
+          ? "Đã bắt response lưu tạm: " + response.refNo
+          : "Đã bắt response lưu tạm.",
+        response.success ? "ok" : "error"
+      );
     }
   }
 

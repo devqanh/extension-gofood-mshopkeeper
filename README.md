@@ -64,6 +64,16 @@ Nếu người dùng nhập thêm nội dung sau mã chuẩn, ví dụ `GOFOOD26
 Để tránh trùng mã khi tạo nhiều hóa đơn quá nhanh, nếu mã `YYMMDDHHMMSS` hiện tại đã được dùng trong các ô ghi chú đang mở hoặc trong phiên hiện tại, extension tự nhích sang giây kế tiếp chưa dùng.
 Block QR có thêm dòng lưu ý không xoá mã `GOFOOD...` trong mục ghi chú để kế toán tra soát dữ liệu.
 
+## Bắt response lưu tạm
+
+Extension inject `src/page-hook.js` vào page context để bắt response của endpoint:
+
+```text
+/SAInvoice/save-sync
+```
+
+Khi hệ thống gọi API này, ví dụ sau khi bấm `Lưu tạm (F10)`, extension đọc được JSON response như `Code`, `Success`, `Data.RefNo`. Response cuối cùng được lưu vào `chrome.storage.local.lastSaveSyncResponse`, đồng thời log ra Console với prefix `[GoFood VietQR]`.
+
 ## Ghi chú VietQR
 
 Quick Link đang được tạo theo mẫu:

@@ -7,13 +7,13 @@
   var PAGE_HOOK_SCRIPT = "src/page-hook.js";
   var PAGE_HOOK_SOURCE = "gofood-vietqr-page-hook";
   var SAVE_SYNC_MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
-  var INVOICE_REF_WEBHOOK_URL = "https://webhook.site/c2a8e0a2-afb7-4423-83f0-27c5a7c2c97a";
+  var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
 
   var state = {
     config: null,
     settings: {
-      apiUrl: "",
-      selectedBankId: ""
+      selectedBankId: "",
+      selectedBranchId: ""
     },
     activeScope: null,
     lastInteractedScope: null,
@@ -99,7 +99,7 @@
 
     state.lastSaveSyncResponse = response;
     attachSaveSyncResponseToPanel(response);
-    sendInvoiceRefToWebhook(response);
+    sendTransactionSyncToApi(response);
     storageSet("local", {
       lastSaveSyncResponse: response
     });
@@ -168,8 +168,8 @@
     }
   }
 
-  function sendInvoiceRefToWebhook(response) {
-    var endpoint = INVOICE_REF_WEBHOOK_URL;
+  function sendTransactionSyncToApi(response) {
+    var endpoint = getApiUrl("/api/transactions/sync");
     var transferNote = detectCurrentTransferNote();
 
     if (!response.refNo || !transferNote || !endpoint) {
@@ -204,7 +204,11 @@
       paymentTotalText: paymentSnapshot.paymentTotalText,
       paymentMethods: paymentSnapshot.paymentMethods,
       paymentsByType: paymentSnapshot.paymentsByType,
+      branchId: selectedBank ? selectedBank.branchId || selectedBank.id : "",
+      branchName: selectedBank ? selectedBank.branchName || selectedBank.label : "",
+      transferPrefix: selectedBank ? selectedBank.transferPrefix || getTransferNotePrefix() : getTransferNotePrefix(),
       bankId: selectedBank ? selectedBank.bankId : "",
+      bankName: selectedBank ? selectedBank.bankName || "" : "",
       bankAccountNo: selectedBank ? selectedBank.accountNo : "",
       bankAccountName: selectedBank ? selectedBank.accountName : "",
       sourceUrl: window.location.href,
@@ -221,13 +225,13 @@
       capturedAt: response.capturedAt
     };
 
-    postWebhookPayload(endpoint, payload).then(function (result) {
+    postApiPayload(endpoint, payload).then(function (result) {
       if (!result || result.ok === false) {
-        throw new Error(result && result.error ? result.error : "Webhook không nhận dữ liệu.");
+        throw new Error(result && result.error ? result.error : "API không nhận dữ liệu.");
       }
 
       if (result.status && result.status >= 400) {
-        throw new Error("Webhook trả về HTTP " + result.status + ".");
+        throw new Error("API trả về HTTP " + result.status + ".");
       }
 
       return result;
@@ -237,7 +241,7 @@
       });
 
       if (state.elements.status) {
-        setStatus("Đã gửi webhook RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
+        setStatus("Đã gửi API RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
       }
     }).catch(function (error) {
       state.lastInvoiceRefSaveKey = "";
@@ -245,16 +249,17 @@
         setStatus(error.message, "error");
       }
       if (window.console && typeof window.console.warn === "function") {
-        window.console.warn("[GoFood VietQR] Không gửi được webhook RefNo:", error);
+        window.console.warn("[GoFood VietQR] Không gửi được API RefNo:", error);
       }
     });
   }
 
-  function postWebhookPayload(endpoint, payload) {
+  function postApiPayload(endpoint, payload) {
     if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
       return new Promise(function (resolve) {
         chrome.runtime.sendMessage({
-          type: "GOFOOD_VIETQR_POST_WEBHOOK",
+          type: API_REQUEST_MESSAGE_TYPE,
+          method: "POST",
           endpoint: endpoint,
           payload: payload
         }, function (response) {
@@ -271,38 +276,71 @@
             error: "Background không trả phản hồi."
           });
         });
-      }).then(function (result) {
-        if (result && result.ok !== false) {
-          return result;
-        }
+      });
+    }
 
-        return postWebhookPayloadNoCors(endpoint, payload).then(function (fallbackResult) {
-          fallbackResult.backgroundError = result ? result.error : "";
-          return fallbackResult;
+    return fetch(endpoint, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      return {
+        ok: response.ok,
+        status: response.status
+      };
+    });
+  }
+
+  function getApiJson(endpoint) {
+    if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+      return new Promise(function (resolve, reject) {
+        chrome.runtime.sendMessage({
+          type: API_REQUEST_MESSAGE_TYPE,
+          method: "GET",
+          endpoint: endpoint
+        }, function (response) {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message || "Không gửi được message tới background."));
+            return;
+          }
+
+          if (!response || response.ok === false) {
+            reject(new Error(response && response.error ? response.error : "API không trả phản hồi."));
+            return;
+          }
+
+          if (response.status && response.status >= 400) {
+            reject(new Error("API trả về HTTP " + response.status + "."));
+            return;
+          }
+
+          resolve(response.json || {});
         });
       });
     }
 
-    return postWebhookPayloadNoCors(endpoint, payload);
+    return fetch(endpoint, {
+      cache: "no-store",
+      credentials: "omit"
+    }).then(function (response) {
+      if (!response.ok) {
+        throw new Error("API trả về HTTP " + response.status + ".");
+      }
+      return response.json();
+    });
   }
 
-  function postWebhookPayloadNoCors(endpoint, payload) {
-    return fetch(endpoint, {
-      method: "POST",
-      mode: "no-cors",
-      cache: "no-store",
-      credentials: "omit",
-      headers: {
-        "Content-Type": "text/plain;charset=UTF-8"
-      },
-      body: JSON.stringify(payload)
-    }).then(function () {
-      return {
-        ok: true,
-        status: 0,
-        noCors: true
-      };
-    });
+  function getApiBaseUrl() {
+    var config = window.GOFOOD_API_CONFIG || {};
+    return String(config.baseUrl || "http://localhost:8222").replace(/\/+$/, "");
+  }
+
+  function getApiUrl(path) {
+    return getApiBaseUrl() + "/" + String(path || "").replace(/^\/+/, "");
   }
 
   function detectCurrentTransferNote() {
@@ -983,38 +1021,37 @@
 
     return Promise.all([
       storageGet("sync", {
-        apiUrl: "",
-        selectedBankId: ""
+        selectedBankId: "",
+        selectedBranchId: ""
       }),
       storageGet("local", {
         cachedConfig: null
       })
     ]).then(function (results) {
       state.settings = results[0] || state.settings;
+      state.settings.selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
+      state.settings.selectedBankId = state.settings.selectedBankId || state.settings.selectedBranchId || "";
       state.config = normalizeConfig(results[1] && results[1].cachedConfig);
 
-      if (!state.settings.apiUrl) {
-        return state.config;
-      }
-
-      if (state.config && !forceApi) {
-        refreshConfigInBackground(state.settings.apiUrl);
-        return state.config;
-      }
-
-      return fetchConfig(state.settings.apiUrl).then(function (config) {
+      return fetchConfig().then(function (config) {
         state.config = config;
         return storageSet("local", {
           cachedConfig: config
         }).then(function () {
           return state.config;
         });
+      }).catch(function (error) {
+        if (state.config && !forceApi) {
+          return state.config;
+        }
+
+        throw error;
       });
     });
   }
 
-  function refreshConfigInBackground(apiUrl) {
-    fetchConfig(apiUrl).then(function (config) {
+  function refreshConfigInBackground() {
+    fetchConfig().then(function (config) {
       state.config = config;
       return storageSet("local", {
         cachedConfig: config
@@ -1026,19 +1063,13 @@
     });
   }
 
-  function fetchConfig(apiUrl) {
-    return fetch(apiUrl, {
-      cache: "no-store",
-      credentials: "omit"
-    }).then(function (response) {
-      if (!response.ok) {
-        throw new Error("API cấu hình trả về HTTP " + response.status + ".");
-      }
-      return response.json();
+  function fetchConfig() {
+    return getApiJson(getApiUrl("/api/branches")).then(function (json) {
+      return json;
     }).then(function (json) {
       var config = normalizeConfig(json);
       if (!config || !config.banks.length) {
-        throw new Error("API chưa có tài khoản ngân hàng active.");
+        throw new Error("API chưa có chi nhánh/ngân hàng active.");
       }
       return config;
     });
@@ -1060,9 +1091,7 @@
       select.appendChild(emptyOption);
       select.disabled = true;
       state.elements.changeNote.disabled = true;
-      state.elements.bankInfo.textContent = state.settings.apiUrl
-        ? "Không đọc được danh sách ngân hàng từ API. Hãy kiểm tra endpoint PHP trong icon extension."
-        : "Hãy bấm icon extension trên thanh công cụ để nhập API URL PHP.";
+      state.elements.bankInfo.textContent = "Không đọc được danh sách chi nhánh từ " + getApiBaseUrl() + ".";
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = "--";
       state.elements.noteWarningCode.textContent = "--";
@@ -1079,12 +1108,13 @@
       select.appendChild(option);
     });
 
-    var selectedBankId = state.settings.selectedBankId;
+    var selectedBankId = state.settings.selectedBranchId || state.settings.selectedBankId;
     var hasSelectedBank = banks.some(function (bank) {
       return bank.id === selectedBankId;
     });
 
     select.value = hasSelectedBank ? selectedBankId : banks[0].id;
+    state.settings.selectedBranchId = select.value;
     state.settings.selectedBankId = select.value;
     select.disabled = false;
     state.elements.changeNote.disabled = false;
@@ -1107,6 +1137,8 @@
     }
 
     state.elements.bankInfo.textContent = [
+      bank.branchName || bank.label || "Chi nhánh",
+      " - ",
       bank.accountName || "Tên chủ TK chưa cấu hình",
       " - ",
       bank.accountNo
@@ -1267,24 +1299,60 @@
   }
 
   function getTransferNotePrefix() {
+    var selectedBank = getSelectedBank();
+    if (selectedBank && selectedBank.transferPrefix) {
+      return selectedBank.transferPrefix;
+    }
+
     var noteConfig = state.config && state.config.note ? state.config.note : {};
     return noteConfig.prefix || "GOFOOD";
   }
 
-  function getCanonicalTransferNote(value) {
-    var prefix = sanitizeTransferNote(getTransferNotePrefix()).replace(/\s+/g, "");
-    if (!prefix) {
-      return "";
+  function getTransferNotePrefixes() {
+    var prefixes = [getTransferNotePrefix()];
+    var noteConfig = state.config && state.config.note ? state.config.note : {};
+
+    if (noteConfig.prefix) {
+      prefixes.push(noteConfig.prefix);
     }
 
+    getBanks().forEach(function (bank) {
+      if (bank.transferPrefix) {
+        prefixes.push(bank.transferPrefix);
+      }
+    });
+
+    prefixes.push("GOFOOD");
+
+    var seen = {};
+    return prefixes.map(function (prefix) {
+      return sanitizeTransferNote(prefix).replace(/\s+/g, "");
+    }).filter(function (prefix) {
+      if (!prefix || seen[prefix]) {
+        return false;
+      }
+      seen[prefix] = true;
+      return true;
+    });
+  }
+
+  function getCanonicalTransferNote(value) {
     var normalized = removeVietnameseMarks(String(value || ""))
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, " ")
       .trim();
     var compact = normalized.replace(/\s+/g, "");
-    var match = compact.match(new RegExp("^" + escapeRegExp(prefix) + "(\\d{12})"));
 
-    return match ? prefix + match[1] : "";
+    var prefixes = getTransferNotePrefixes();
+    for (var i = 0; i < prefixes.length; i += 1) {
+      var prefix = prefixes[i];
+      var match = compact.match(new RegExp("^" + escapeRegExp(prefix) + "(\\d{12})"));
+      if (match) {
+        return prefix + match[1];
+      }
+    }
+
+    return "";
   }
 
   function escapeRegExp(value) {
@@ -1560,21 +1628,30 @@
       return null;
     }
 
-    var banks = Array.isArray(raw.banks) ? raw.banks : [];
+    var banks = Array.isArray(raw.banks)
+      ? raw.banks
+      : (Array.isArray(raw.data) ? raw.data : []);
     var normalizedBanks = banks.map(function (bank, index) {
-      var bankId = String(bank.bankId || bank.bank_id || bank.bin || bank.code || "").trim();
-      var accountNo = String(bank.accountNo || bank.account_no || bank.account || "").replace(/\s+/g, "").trim();
+      var bankId = String(bank.bankId || bank.bank_id || bank.bank_bin || bank.bin || bank.code || "").trim();
+      var accountNo = String(bank.accountNo || bank.account_no || bank.account_number || bank.account || "").replace(/\s+/g, "").trim();
       var accountName = String(bank.accountName || bank.account_name || "").trim();
-      var id = String(bank.id || bankId + "-" + accountNo || "bank-" + index).trim();
-      var label = String(bank.label || [bank.shortName || bank.code || bankId, accountNo].filter(Boolean).join(" - ")).trim();
+      var bankName = String(bank.bankName || bank.bank_name || bank.shortName || "").trim();
+      var branchName = String(bank.branchName || bank.branch_name || bank.name || "").trim();
+      var transferPrefix = String(bank.transferPrefix || bank.transfer_prefix || "").trim();
+      var id = String(bank.id || bank.branch_id || bankId + "-" + accountNo || "bank-" + index).trim();
+      var label = String(bank.label || [branchName, bankName || bank.code || bankId, accountNo].filter(Boolean).join(" - ")).trim();
       var template = String(bank.template || "").trim();
 
       return {
         id: id,
+        branchId: id,
+        branchName: branchName,
         label: label || "Tài khoản " + (index + 1),
+        bankName: bankName,
         bankId: bankId,
         accountNo: accountNo,
         accountName: accountName,
+        transferPrefix: transferPrefix,
         template: template || null
       };
     }).filter(function (bank) {
@@ -1582,9 +1659,13 @@
     });
 
     return {
-      ok: raw.ok !== false,
+      ok: raw.ok !== false && raw.success !== false,
       defaults: raw.defaults || {},
-      note: raw.note || {},
+      note: raw.note || {
+        prefix: "GOFOOD",
+        maxLength: 50,
+        uppercase: true
+      },
       endpoints: raw.endpoints || {},
       banks: normalizedBanks
     };
@@ -1597,7 +1678,7 @@
   function getSelectedBank() {
     var selectedId = state.elements.bank && state.elements.bank.value
       ? state.elements.bank.value
-      : state.settings.selectedBankId;
+      : (state.settings.selectedBranchId || state.settings.selectedBankId);
     return getBanks().find(function (bank) {
       return bank.id === selectedId;
     }) || null;

@@ -1,36 +1,27 @@
 # GoFood VietQR Helper
 
-Extension Chrome này tự tạo ảnh VietQR trên các site `*.mshopkeeper.vn`, tự điền nội dung chuyển khoản vào ô `Ghi chú ...`, và append ảnh QR vào đúng khung thanh toán của tab mua hàng hiện tại.
+Extension Chrome này tự tạo ảnh VietQR trên các site `*.mshopkeeper.vn`, tự điền nội dung chuyển khoản vào ô `Ghi chú ...`, append ảnh QR vào đúng khung thanh toán của tab mua hàng hiện tại, và đồng bộ RefNo hóa đơn về API GoFood Misa.
 
-## Cấu hình PHP
-
-1. Sửa thông tin tài khoản trong `api/config.php`.
-2. Upload thư mục `api` lên hosting có PHP.
-3. Endpoint cần nhập vào extension là file `banks.php`, ví dụ:
+Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
 ```text
-https://ten-mien-cua-ban.vn/gofood-vietqr/banks.php
+http://localhost:8222
 ```
 
-Mẫu cấu hình một tài khoản:
+Sau này đổi domain thật thì sửa `baseUrl` trong file này.
 
-```php
-[
-    'id' => 'vcb-main',
-    'label' => 'Vietcombank - tài khoản chính',
-    'bank_id' => '970436',
-    'account_no' => '0123456789',
-    'account_name' => 'TÊN CHỦ TÀI KHOẢN',
-    'template' => 'compact2',
-    'active' => true,
-]
-```
+## Cấu hình API
 
-`bank_id` có thể là mã BIN, code ngân hàng, hoặc tên ngân hàng mà VietQR hỗ trợ. Nếu cần xem danh sách ngân hàng, dùng API công khai:
+Extension đang tích hợp API GoFood Misa theo `C:\laragon\www\gofood-misa\API.MD`:
 
 ```text
-https://api.vietqr.io/v2/banks
+GET  /api/branches
+POST /api/transactions/sync
 ```
+
+`GET /api/branches` trả danh sách chi nhánh gồm `id`, `name`, `bank_bin`, `bank_name`, `account_name`, `account_number`, `transfer_prefix`. Extension dùng dữ liệu này để chọn chi nhánh, tạo QR VietQR và sinh prefix nội dung chuyển khoản.
+
+`POST /api/transactions/sync` nhận payload sau khi MShopKeeper trả `Data.RefNo` từ endpoint `save-sync`.
 
 ## Cài extension
 
@@ -38,7 +29,7 @@ https://api.vietqr.io/v2/banks
 2. Bật `Developer mode`.
 3. Bấm `Load unpacked`.
 4. Chọn thư mục gốc của project này.
-5. Bấm icon `GoFood VietQR` trên thanh công cụ, nhập `API URL PHP`, bấm `Tải API`, chọn ngân hàng mặc định, rồi bấm `Lưu`.
+5. Bấm icon `GoFood VietQR` trên thanh công cụ, bấm `Tải chi nhánh`, chọn chi nhánh mặc định, rồi bấm `Lưu`.
 
 ## Sử dụng
 
@@ -62,7 +53,7 @@ Khi bấm nút thêm order có icon `.misa-add-order`, extension sẽ tự xoá 
 Khi click qua lại các tab hóa đơn `.q-tab`, extension sẽ tự dựng lại QR cho tab đang active nếu ghi chú của tab đó vẫn là nội dung chuyển khoản do extension tạo, ví dụ bắt đầu bằng `GOFOOD`.
 Nếu người dùng nhập thêm nội dung sau mã chuẩn, ví dụ `GOFOOD260708133911 ghi chú thêm`, VietQR chỉ dùng `GOFOOD260708133911` và bỏ qua phần phía sau.
 Để tránh trùng mã khi tạo nhiều hóa đơn quá nhanh, nếu mã `YYMMDDHHMMSS` hiện tại đã được dùng trong các ô ghi chú đang mở hoặc trong phiên hiện tại, extension tự nhích sang giây kế tiếp chưa dùng.
-Block QR có thêm dòng lưu ý không xoá mã `GOFOOD...` trong mục ghi chú để kế toán tra soát dữ liệu.
+Block QR có thêm dòng lưu ý không xoá mã chuyển khoản trong mục ghi chú để kế toán tra soát dữ liệu.
 
 ## Bắt response lưu tạm
 
@@ -94,30 +85,19 @@ Khi response có dạng:
 }
 ```
 
-extension sẽ lấy `Data.RefNo`, ghép với nội dung chuyển khoản đang có trong ghi chú, ví dụ `GOFOOD260708154412`, rồi gửi về API PHP:
+extension sẽ lấy `Data.RefNo`, ghép với nội dung chuyển khoản đang có trong ghi chú, ví dụ `GOFOOD260708154412`, rồi gửi về API:
 
 ```text
-POST /invoice-refs.php
+POST http://localhost:8222/api/transactions/sync
 ```
 
-Endpoint này lưu mapping `RefNo` ↔ `transferNote` vào `api/data/invoice-refs.json`. Hosting cần cấp quyền ghi cho thư mục `api` hoặc thư mục `api/data`.
-
-Xem danh sách có phân trang:
+Extension tự tải danh sách chi nhánh từ:
 
 ```text
-GET /invoice-refs.php?page=1&perPage=20
-GET /invoice-refs.php?page=1&perPage=20&q=GOFOOD260708154412
+GET http://localhost:8222/api/branches
 ```
 
-Popup extension cũng có khung `RefNo đã lưu` để tải nhanh danh sách này.
-
-Tạm thời extension đang gửi JSON bắt được lên Webhook.site bằng background service worker để tránh lỗi CORS/preflight:
-
-```text
-POST https://webhook.site/c2a8e0a2-afb7-4423-83f0-27c5a7c2c97a
-```
-
-Payload gồm `refNo`, `transferNote`, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt và thời điểm post.
+Payload gồm `refNo`, `transferNote`, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt, thông tin chi nhánh/ngân hàng và thời điểm post.
 
 ## Ghi chú VietQR
 

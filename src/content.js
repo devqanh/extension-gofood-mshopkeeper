@@ -547,6 +547,11 @@
       }
     }
 
+    var textAmount = extractLikelyAmountFromText(getTextExcludingQrPanel(item));
+    if (textAmount) {
+      return textAmount;
+    }
+
     return "";
   }
 
@@ -679,6 +684,10 @@
       }
     }, true);
 
+    ["input", "change"].forEach(function (eventName) {
+      document.addEventListener(eventName, handlePaymentValueChange, true);
+    });
+
     var observerRoot = document.body || document.documentElement;
     if (!observerRoot) {
       return;
@@ -697,6 +706,29 @@
       subtree: true,
       characterData: true
     });
+  }
+
+  function handlePaymentValueChange(event) {
+    var target = event.target;
+    if (!(target instanceof Element) || target.closest("." + PANEL_CLASS)) {
+      return;
+    }
+
+    if (!isPaymentValueElement(target)) {
+      return;
+    }
+
+    var scope = findPaymentScopeFromElement(target);
+    if (!scope) {
+      return;
+    }
+
+    state.lastInteractedScope = scope;
+    scheduleAutoNoteForActiveScope();
+  }
+
+  function isPaymentValueElement(element) {
+    return Boolean(element.closest(".type-payment-wrap, .type-payment-item"));
   }
 
   function isRelevantPaymentMutation(mutation) {
@@ -1448,7 +1480,7 @@
       }
     }
     if (!amount) {
-      setStatus("Chưa tìm thấy số tiền Còn phải thu trên trang.", "error");
+      setStatus("Chưa tìm thấy số tiền Chuyển khoản hoặc Còn phải thu trên trang.", "error");
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = note || "--";
       state.elements.noteWarningCode.textContent = note || "--";
@@ -1659,10 +1691,11 @@
 
   function primeAmountField(options) {
     var force = options && options.force;
-    var receivableAmount = detectReceivableAmountFromPage(getActiveScope());
-    if (receivableAmount) {
-      state.elements.amount.value = formatAmount(receivableAmount);
-      state.elements.amountText.textContent = formatAmount(receivableAmount);
+
+    var detectedAmount = detectAmountFromPage();
+    if (detectedAmount) {
+      state.elements.amount.value = formatAmount(detectedAmount);
+      state.elements.amountText.textContent = formatAmount(detectedAmount);
       return;
     }
 
@@ -1677,16 +1710,15 @@
       state.elements.amountText.textContent = formatAmount(defaultAmount);
       return;
     }
-
-    var detectedAmount = detectAmountFromPage();
-    if (detectedAmount) {
-      state.elements.amount.value = formatAmount(detectedAmount);
-      state.elements.amountText.textContent = formatAmount(detectedAmount);
-    }
   }
 
   function detectAmountFromPage() {
     var scope = getActiveScope();
+    var bankTransferAmount = detectBankTransferAmountFromPage(scope);
+    if (bankTransferAmount) {
+      return bankTransferAmount;
+    }
+
     var receivableAmount = detectReceivableAmountFromPage(scope);
     if (receivableAmount) {
       return receivableAmount;
@@ -1716,6 +1748,16 @@
     }
 
     return String(Math.max.apply(Math, candidates));
+  }
+
+  function detectBankTransferAmountFromPage(scope) {
+    var paymentMethods = detectPaymentMethods(scope || document);
+    var summary = summarizePaymentMethods(paymentMethods);
+    if (summary.bankTransferAmount && isValidQrAmount(summary.bankTransferAmount)) {
+      return summary.bankTransferAmount;
+    }
+
+    return "";
   }
 
   function detectReceivableAmountFromPage(scope) {

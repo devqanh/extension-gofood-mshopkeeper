@@ -44,17 +44,52 @@
 
     if (chrome && chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener(function (changes, areaName) {
-        if (areaName !== "sync" && areaName !== "local") {
+        if (areaName === "local") {
+          if (changes.cachedConfig) {
+            state.config = normalizeConfig(changes.cachedConfig.newValue);
+            if (state.elements.panel) {
+              renderConfig();
+            }
+          }
           return;
         }
+
+        if (areaName !== "sync") {
+          return;
+        }
+
+        var branchSelectionChanged = Boolean(changes.selectedBranchId || changes.selectedBankId);
 
         loadState().then(function () {
           if (state.elements.panel) {
             renderConfig();
           }
+
+          if (branchSelectionChanged) {
+            refreshQrForSelectedBranch();
+          }
         });
       });
     }
+  }
+
+  function refreshQrForSelectedBranch() {
+    var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true });
+
+    if (!scope) {
+      return;
+    }
+
+    state.activeScope = scope;
+    state.lastInteractedScope = scope;
+    activateEmbeddedPanel(scope);
+    renderConfig();
+    primeAmountField({ force: true });
+    handleGenerate({
+      refreshAmount: true,
+      newNote: true,
+      noScroll: true
+    });
   }
 
   function injectPageNetworkHook() {

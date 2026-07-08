@@ -30,6 +30,9 @@
       state.settings.selectedBranchId = elements.bankSelect.value || "";
       state.settings.selectedBankId = state.settings.selectedBranchId;
       renderBankInfo();
+      saveSettings({
+        auto: true
+      });
     });
 
     Promise.all([
@@ -84,7 +87,8 @@
     });
   }
 
-  function saveSettings() {
+  function saveSettings(options) {
+    var isAuto = options && options.auto;
     state.settings.selectedBranchId = elements.bankSelect.value || "";
     state.settings.selectedBankId = state.settings.selectedBranchId;
 
@@ -94,7 +98,7 @@
         cachedConfig: state.config
       })
     ]).then(function () {
-      setStatus("Đã lưu chi nhánh mặc định.", "ok");
+      setStatus(isAuto ? "Đã chọn chi nhánh cho QR." : "Đã lưu chi nhánh mặc định.", "ok");
     });
   }
 

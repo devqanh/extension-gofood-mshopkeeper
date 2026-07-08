@@ -3,6 +3,11 @@
 
   var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
   var LEGACY_WEBHOOK_MESSAGE_TYPE = "GOFOOD_VIETQR_POST_WEBHOOK";
+  var API_ORIGIN = "https://gofood.dewa.vn";
+  var ALLOWED_API_PATHS = [
+    "/api/branches",
+    "/api/transactions/sync"
+  ];
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message || (message.type !== API_REQUEST_MESSAGE_TYPE && message.type !== LEGACY_WEBHOOK_MESSAGE_TYPE)) {
@@ -33,6 +38,13 @@
       });
     }
 
+    if (!isAllowedApiEndpoint(endpoint)) {
+      return Promise.resolve({
+        ok: false,
+        error: "API endpoint is not allowed"
+      });
+    }
+
     var options = {
       method: method,
       cache: "no-store",
@@ -59,6 +71,15 @@
         };
       });
     });
+  }
+
+  function isAllowedApiEndpoint(endpoint) {
+    try {
+      var url = new URL(endpoint);
+      return url.origin === API_ORIGIN && ALLOWED_API_PATHS.indexOf(url.pathname) !== -1;
+    } catch (error) {
+      return false;
+    }
   }
 
   function parseJson(text) {

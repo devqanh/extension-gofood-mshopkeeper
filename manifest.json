@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GoFood VietQR Helper",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Tạo QR VietQR cho các site *.mshopkeeper.vn và tự điền ghi chú chuyển khoản.",
   "permissions": [
     "storage"
@@ -10,14 +10,23 @@
     "https://*.mshopkeeper.vn/*",
     "http://*.mshopkeeper.vn/*",
     "https://gofood.dewa.vn/*",
-    "https://img.vietqr.io/*",
-    "https://api.vietqr.io/*",
-    "http://*/*",
-    "https://*/*"
+    "https://img.vietqr.io/*"
   ],
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
   "action": {
     "default_title": "GoFood VietQR",
-    "default_popup": "src/popup.html"
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
   },
   "background": {
     "service_worker": "src/background.js"

@@ -2,6 +2,18 @@
 
 Extension Chrome này tự tạo ảnh VietQR trên các site `*.mshopkeeper.vn`, tự điền nội dung chuyển khoản vào ô `Ghi chú ...`, append ảnh QR vào đúng khung thanh toán của tab mua hàng hiện tại, và đồng bộ RefNo hóa đơn về API GoFood Misa.
 
+## Chrome Web Store
+
+Bộ icon extension nằm trong `assets/icons`. Ảnh quảng bá, screenshot, nội dung listing và mẫu chính sách quyền riêng tư nằm trong `store-assets`.
+
+Tạo file ZIP chỉ chứa mã extension cần upload:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
+```
+
+File kết quả: `build/gofood-vietqr-helper-1.0.14.zip`.
+
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
 ```text

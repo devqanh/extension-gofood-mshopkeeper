@@ -21,6 +21,7 @@
     generatedNoteCodes: {},
     lastNoteEpochSecond: 0,
     lastSaveSyncResponse: null,
+    lastSaveSyncAlertKey: "",
     elements: {}
   };
 
@@ -97,6 +98,7 @@
 
     state.lastSaveSyncResponse = response;
     attachSaveSyncResponseToPanel(response);
+    alertSaveSyncResponse(response);
     storageSet("local", {
       lastSaveSyncResponse: response
     });
@@ -124,6 +126,26 @@
       bodyJson: json,
       bodyText: String(payload.bodyText || "").slice(0, 4000)
     };
+  }
+
+  function alertSaveSyncResponse(response) {
+    var alertKey = [
+      response.status || "",
+      response.refNo || "",
+      response.bodyText || ""
+    ].join("|").slice(0, 500);
+
+    if (alertKey && alertKey === state.lastSaveSyncAlertKey) {
+      return;
+    }
+
+    state.lastSaveSyncAlertKey = alertKey;
+
+    window.alert(
+      response.refNo
+        ? "Bắt được save-sync RefNo: " + response.refNo
+        : "Bắt được save-sync nhưng không thấy RefNo. HTTP status: " + (response.status || "unknown")
+    );
   }
 
   function extractSaveSyncRefNo(json) {

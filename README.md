@@ -37,6 +37,7 @@ POST /api/transactions/sync
 2. Khi khung thanh toán xuất hiện, extension tự sinh ghi chú chuyển khoản, tự điền vào ô `Ghi chú ...`, và tự hiện QR trong khung thanh toán của tab đang mở.
 3. Extension sẽ ưu tiên lấy số tiền từ dòng `Còn phải thu`, ví dụ `545,000`.
 4. Trong block QR chỉ có ảnh QR và nút `Đổi nội dung`.
+5. Bên dưới QR có dòng chi nhánh hiện tại; bấm `Thay đổi` để mở select chọn chi nhánh, QR sẽ tự tạo lại theo chi nhánh vừa chọn.
 
 Extension sẽ:
 

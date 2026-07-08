@@ -23,6 +23,8 @@
     lastNoteEpochSecond: 0,
     lastSaveSyncResponse: null,
     lastInvoiceRefSaveKey: "",
+    lastBranchRefreshId: "",
+    lastBranchRefreshAt: 0,
     elements: {}
   };
 
@@ -74,6 +76,18 @@
   }
 
   function refreshQrForSelectedBranch() {
+    var selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
+    var now = Date.now();
+
+    if (selectedBranchId
+      && state.lastBranchRefreshId === selectedBranchId
+      && now - state.lastBranchRefreshAt < 800) {
+      return;
+    }
+
+    state.lastBranchRefreshId = selectedBranchId;
+    state.lastBranchRefreshAt = now;
+
     var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true });
 
     if (!scope) {
@@ -863,7 +877,10 @@
       qrWrap: panel.querySelector(".gvq-qr-wrap"),
       qrLink: panel.querySelector(".gvq-qr-link"),
       qrImg: panel.querySelector(".gvq-qr-img"),
-      changeNote: panel.querySelector(".gvq-change-note")
+      changeNote: panel.querySelector(".gvq-change-note"),
+      branchLabel: panel.querySelector(".gvq-branch-label"),
+      branchPicker: panel.querySelector(".gvq-branch-picker"),
+      toggleBranch: panel.querySelector(".gvq-branch-toggle")
     };
 
     if (!panel.dataset.gvqBound) {
@@ -901,16 +918,54 @@
           currentButton.classList.remove("gvq-refreshing");
         }, 2000);
       });
+
+      state.elements.toggleBranch.addEventListener("click", function () {
+        var picker = panel.querySelector(".gvq-branch-picker");
+        var toggle = panel.querySelector(".gvq-branch-toggle");
+        var select = panel.querySelector(".gvq-bank");
+        var shouldOpen = picker.hasAttribute("hidden");
+
+        picker.toggleAttribute("hidden", !shouldOpen);
+        toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+
+        if (shouldOpen && select && !select.disabled) {
+          select.focus();
+        }
+      });
+
+      state.elements.bank.addEventListener("change", function (event) {
+        var select = event.currentTarget;
+        var picker = panel.querySelector(".gvq-branch-picker");
+        var toggle = panel.querySelector(".gvq-branch-toggle");
+        var selectedBranchId = select.value || "";
+
+        state.settings.selectedBranchId = selectedBranchId;
+        state.settings.selectedBankId = selectedBranchId;
+        updateBranchLabel();
+        picker.setAttribute("hidden", "");
+        toggle.setAttribute("aria-expanded", "false");
+
+        storageSet("sync", state.settings).then(function () {
+          refreshQrForSelectedBranch();
+        });
+      });
     }
   }
 
   function ensureEmbeddedPanel(scope) {
     var panel = scope.querySelector(":scope > ." + PANEL_CLASS);
     if (panel) {
-      return panel;
+      if (panel.querySelector(".gvq-branch-panel")) {
+        return panel;
+      }
+
+      if (panel._gvqObserver) {
+        panel._gvqObserver.disconnect();
+      }
+      panel.remove();
     }
 
-    var panel = document.createElement("section");
+    panel = document.createElement("section");
     panel.className = PANEL_CLASS;
     panel.setAttribute("aria-label", "GoFood VietQR");
     panel.innerHTML = [
@@ -929,11 +984,22 @@
       '      <img class="gvq-qr-img" alt="Mã QR VietQR" />',
       '    </a>',
       '  </div>',
+      '  <div class="gvq-branch-panel">',
+      '    <div class="gvq-branch-current">',
+      '      <div class="gvq-branch-copy">',
+      '        <span>Chi nhánh hiện tại</span>',
+      '        <strong class="gvq-branch-label">--</strong>',
+      '      </div>',
+      '      <button class="gvq-branch-toggle" type="button" aria-expanded="false">Thay đổi</button>',
+      '    </div>',
+      '    <div class="gvq-branch-picker" hidden>',
+      '      <select class="gvq-bank" aria-label="Chọn chi nhánh nhận tiền"></select>',
+      '    </div>',
+      '  </div>',
       '  <div class="gvq-bank-info gvq-hidden-control"></div>',
       '  <strong class="gvq-amount-text gvq-hidden-control">--</strong>',
       '  <strong class="gvq-note-text gvq-hidden-control">--</strong>',
       '  <div class="gvq-status gvq-hidden-control" role="status"></div>',
-      '  <select class="gvq-bank gvq-hidden-control" aria-hidden="true" tabindex="-1"></select>',
       '  <input class="gvq-amount gvq-hidden-control" aria-hidden="true" tabindex="-1" />',
       '  <input class="gvq-note gvq-hidden-control" aria-hidden="true" tabindex="-1" />',
       '</div>'
@@ -1159,7 +1225,9 @@
       select.appendChild(emptyOption);
       select.disabled = true;
       state.elements.changeNote.disabled = true;
+      state.elements.toggleBranch.disabled = true;
       state.elements.bankInfo.textContent = "Không đọc được danh sách chi nhánh từ " + getApiBaseUrl() + ".";
+      state.elements.branchLabel.textContent = "Chưa có chi nhánh";
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = "--";
       state.elements.noteWarningCode.textContent = "--";
@@ -1186,6 +1254,8 @@
     state.settings.selectedBankId = select.value;
     select.disabled = false;
     state.elements.changeNote.disabled = false;
+    state.elements.toggleBranch.disabled = false;
+    updateBranchLabel();
     renderBankInfo();
 
     if (!state.elements.note.value) {
@@ -1201,6 +1271,7 @@
     var bank = getSelectedBank();
     if (!bank) {
       state.elements.bankInfo.textContent = "Chưa chọn ngân hàng.";
+      updateBranchLabel();
       return;
     }
 
@@ -1211,6 +1282,26 @@
       " - ",
       bank.accountNo
     ].join("");
+
+    updateBranchLabel();
+  }
+
+  function updateBranchLabel() {
+    if (!state.elements.branchLabel) {
+      return;
+    }
+
+    var bank = getSelectedBank();
+    if (!bank) {
+      state.elements.branchLabel.textContent = "Chưa chọn chi nhánh";
+      return;
+    }
+
+    state.elements.branchLabel.textContent = [
+      bank.branchName || bank.label || "Chi nhánh",
+      bank.bankName || bank.bankId || "",
+      bank.accountNo || ""
+    ].filter(Boolean).join(" - ");
   }
 
   function handleGenerate(options) {

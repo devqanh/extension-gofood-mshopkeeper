@@ -253,7 +253,7 @@
 
   function getApiBaseUrl() {
     var config = window.GOFOOD_API_CONFIG || {};
-    return String(config.baseUrl || "http://localhost:8222").replace(/\/+$/, "");
+    return String(config.baseUrl || "https://gofood.dewa.vn").replace(/\/+$/, "");
   }
 
   function getApiUrl(path) {

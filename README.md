@@ -5,7 +5,7 @@ Extension Chrome này tự tạo ảnh VietQR trên các site `*.mshopkeeper.vn`
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
 ```text
-http://localhost:8222
+https://gofood.dewa.vn
 ```
 
 Sau này đổi domain thật thì sửa `baseUrl` trong file này.
@@ -91,13 +91,13 @@ Khi response có dạng:
 extension sẽ lấy `Data.RefNo`, ghép với nội dung chuyển khoản đang có trong ghi chú, ví dụ `GOFOOD260708154412`, rồi gửi về API:
 
 ```text
-POST http://localhost:8222/api/transactions/sync
+POST https://gofood.dewa.vn/api/transactions/sync
 ```
 
 Extension tự tải danh sách chi nhánh từ:
 
 ```text
-GET http://localhost:8222/api/branches
+GET https://gofood.dewa.vn/api/branches
 ```
 
 Payload gồm `refNo`, `transferNote`, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt, thông tin chi nhánh/ngân hàng và thời điểm post.

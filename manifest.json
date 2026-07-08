@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GoFood VietQR Helper",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Tạo QR VietQR cho các site *.mshopkeeper.vn và tự điền ghi chú chuyển khoản.",
   "permissions": [
     "storage"
@@ -9,7 +9,7 @@
   "host_permissions": [
     "https://*.mshopkeeper.vn/*",
     "http://*.mshopkeeper.vn/*",
-    "http://localhost:8222/*",
+    "https://gofood.dewa.vn/*",
     "https://img.vietqr.io/*",
     "https://api.vietqr.io/*",
     "http://*/*",

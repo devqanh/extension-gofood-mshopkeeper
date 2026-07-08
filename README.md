@@ -34,10 +34,12 @@ POST /api/transactions/sync
 ## Sử dụng
 
 1. Mở một site bán hàng thuộc `*.mshopkeeper.vn`.
-2. Khi khung thanh toán xuất hiện, extension tự sinh ghi chú chuyển khoản, tự điền vào ô `Ghi chú ...`, và tự hiện QR trong khung thanh toán của tab đang mở.
+2. Khi khung thanh toán xuất hiện, nếu đã chọn chi nhánh nhận tiền, extension tự sinh ghi chú chuyển khoản, tự điền vào ô `Ghi chú ...`, và tự hiện QR trong khung thanh toán của tab đang mở.
 3. Extension sẽ ưu tiên lấy số tiền từ dòng `Còn phải thu`, ví dụ `545,000`.
 4. Trong block QR chỉ có ảnh QR và nút `Đổi nội dung`.
 5. Bên dưới QR có dòng chi nhánh hiện tại; bấm `Thay đổi` để mở select chọn chi nhánh, QR sẽ tự tạo lại theo chi nhánh vừa chọn.
+
+Mặc định sau khi cài hoặc cập nhật bản `1.0.8`, extension không chọn sẵn chi nhánh nào để tránh hiển thị nhầm tài khoản demo. Khi chưa chọn chi nhánh, extension không sinh nội dung chuyển khoản và không hiện QR.
 
 Extension sẽ:
 
@@ -47,7 +49,7 @@ Extension sẽ:
 - Fill nội dung đó vào textarea có placeholder `Ghi chú ...`.
 - Hiện ảnh QR từ Quick Link của VietQR ngay trong div thanh toán `.overflow-auto.flex-1`.
 
-QR được append riêng vào div thanh toán của từng tab mua hàng, nên chuyển qua tab khác sẽ không bị lẫn QR/nội dung của tab trước. Block trên trang được rút gọn chỉ còn ảnh QR và nút đổi nội dung. Nếu cần đổi ngân hàng mặc định, bấm icon extension trên thanh công cụ Chrome.
+QR được append riêng vào div thanh toán của từng tab mua hàng, nên chuyển qua tab khác sẽ không bị lẫn QR/nội dung của tab trước. Nếu cần đổi chi nhánh nhận tiền, bấm `Thay đổi` ngay dưới QR.
 
 Khi bấm nút thêm order có icon `.misa-add-order`, extension sẽ tự xoá block QR đang có để order mới không bị dính QR của order trước.
 

@@ -2,6 +2,7 @@
   "use strict";
 
   var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
+  var BRANCH_SELECTION_RESET_VERSION = "2026-07-08-clear-default-branch";
 
   var state = {
     settings: {
@@ -41,13 +42,30 @@
         selectedBranchId: ""
       }),
       storageGet("local", {
-        cachedConfig: null
+        cachedConfig: null,
+        branchSelectionResetVersion: ""
       })
     ]).then(function (results) {
+      var localState = results[1] || {};
       state.settings = results[0] || state.settings;
+      if (localState.branchSelectionResetVersion !== BRANCH_SELECTION_RESET_VERSION) {
+        state.settings.selectedBranchId = "";
+        state.settings.selectedBankId = "";
+        return Promise.all([
+          storageSet("sync", state.settings),
+          storageSet("local", {
+            branchSelectionResetVersion: BRANCH_SELECTION_RESET_VERSION
+          })
+        ]).then(function () {
+          state.config = normalizeConfig(localState.cachedConfig);
+          renderConfig();
+          return loadBranches();
+        });
+      }
+
       state.settings.selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
       state.settings.selectedBankId = state.settings.selectedBankId || state.settings.selectedBranchId || "";
-      state.config = normalizeConfig(results[1].cachedConfig);
+      state.config = normalizeConfig(localState.cachedConfig);
       renderConfig();
       return loadBranches();
     }).catch(function (error) {
@@ -66,13 +84,7 @@
       }
 
       state.config = config;
-      if (!state.settings.selectedBranchId) {
-        state.settings.selectedBranchId = config.banks[0].id;
-        state.settings.selectedBankId = config.banks[0].id;
-      }
-
       return Promise.all([
-        storageSet("sync", state.settings),
         storageSet("local", {
           cachedConfig: config
         })
@@ -116,6 +128,11 @@
       return;
     }
 
+    var placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = "Chọn chi nhánh nhận tiền";
+    elements.bankSelect.appendChild(placeholderOption);
+
     banks.forEach(function (bank) {
       var option = document.createElement("option");
       option.value = bank.id;
@@ -127,9 +144,9 @@
     var selectedExists = banks.some(function (bank) {
       return bank.id === selectedId;
     });
-    elements.bankSelect.value = selectedExists ? selectedId : banks[0].id;
-    state.settings.selectedBranchId = elements.bankSelect.value;
-    state.settings.selectedBankId = elements.bankSelect.value;
+    elements.bankSelect.value = selectedExists ? selectedId : "";
+    state.settings.selectedBranchId = selectedExists ? elements.bankSelect.value : "";
+    state.settings.selectedBankId = state.settings.selectedBranchId;
     elements.bankSelect.disabled = false;
     renderBankInfo();
   }

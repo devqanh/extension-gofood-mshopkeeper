@@ -8,6 +8,7 @@
   var PAGE_HOOK_SOURCE = "gofood-vietqr-page-hook";
   var SAVE_SYNC_MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
   var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
+  var BRANCH_SELECTION_RESET_VERSION = "2026-07-08-clear-default-branch";
 
   var state = {
     config: null,
@@ -98,6 +99,13 @@
     state.lastInteractedScope = scope;
     activateEmbeddedPanel(scope);
     renderConfig();
+
+    if (!getSelectedBank()) {
+      clearGeneratedSiteNote(scope);
+      clearQrDisplay();
+      return;
+    }
+
     primeAmountField({ force: true });
     handleGenerate({
       refreshAmount: true,
@@ -750,6 +758,14 @@
 
       state.activeScope = scope;
       state.lastInteractedScope = scope;
+      activateEmbeddedPanel(scope);
+      renderConfig();
+
+      if (!getSelectedBank()) {
+        clearGeneratedSiteNote(scope);
+        clearQrDisplay();
+        return;
+      }
 
       if (!(textarea.value || "").trim()) {
         var note = buildTransferNote();
@@ -762,14 +778,21 @@
   }
 
   function renderQrForScope(scope) {
-    if (!getExistingTransferNote(scope)) {
-      return;
-    }
-
     state.activeScope = scope;
     state.lastInteractedScope = scope;
     activateEmbeddedPanel(scope);
     renderConfig();
+
+    if (!getSelectedBank()) {
+      clearGeneratedSiteNote(scope);
+      clearQrDisplay();
+      return;
+    }
+
+    if (!getExistingTransferNote(scope)) {
+      return;
+    }
+
     primeAmountField({ force: true });
     handleGenerate({
       refreshAmount: true,
@@ -1159,27 +1182,47 @@
         selectedBranchId: ""
       }),
       storageGet("local", {
-        cachedConfig: null
+        cachedConfig: null,
+        branchSelectionResetVersion: ""
       })
     ]).then(function (results) {
-      state.settings = results[0] || state.settings;
-      state.settings.selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
-      state.settings.selectedBankId = state.settings.selectedBankId || state.settings.selectedBranchId || "";
-      state.config = normalizeConfig(results[1] && results[1].cachedConfig);
+      var localState = results[1] || {};
+      var settings = results[0] || state.settings;
+      var resetPromise = Promise.resolve(settings);
 
-      return fetchConfig().then(function (config) {
-        state.config = config;
-        return storageSet("local", {
-          cachedConfig: config
-        }).then(function () {
-          return state.config;
+      if (localState.branchSelectionResetVersion !== BRANCH_SELECTION_RESET_VERSION) {
+        settings.selectedBranchId = "";
+        settings.selectedBankId = "";
+        resetPromise = Promise.all([
+          storageSet("sync", settings),
+          storageSet("local", {
+            branchSelectionResetVersion: BRANCH_SELECTION_RESET_VERSION
+          })
+        ]).then(function () {
+          return settings;
         });
-      }).catch(function (error) {
-        if (state.config && !forceApi) {
-          return state.config;
-        }
+      }
 
-        throw error;
+      return resetPromise.then(function (resolvedSettings) {
+        state.settings = resolvedSettings || state.settings;
+        state.settings.selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
+        state.settings.selectedBankId = state.settings.selectedBankId || state.settings.selectedBranchId || "";
+        state.config = normalizeConfig(localState.cachedConfig);
+
+        return fetchConfig().then(function (config) {
+          state.config = config;
+          return storageSet("local", {
+            cachedConfig: config
+          }).then(function () {
+            return state.config;
+          });
+        }).catch(function (error) {
+          if (state.config && !forceApi) {
+            return state.config;
+          }
+
+          throw error;
+        });
       });
     });
   }
@@ -1231,11 +1274,15 @@
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = "--";
       state.elements.noteWarningCode.textContent = "--";
-      state.elements.noteWarning.classList.remove("gvq-show");
-      state.elements.qrWrap.classList.remove("gvq-show");
+      clearQrDisplay();
       setStatus("", "");
       return;
     }
+
+    var placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = "Chọn chi nhánh nhận tiền";
+    select.appendChild(placeholderOption);
 
     banks.forEach(function (bank) {
       var option = document.createElement("option");
@@ -1249,14 +1296,20 @@
       return bank.id === selectedBankId;
     });
 
-    select.value = hasSelectedBank ? selectedBankId : banks[0].id;
-    state.settings.selectedBranchId = select.value;
-    state.settings.selectedBankId = select.value;
+    select.value = hasSelectedBank ? selectedBankId : "";
+    state.settings.selectedBranchId = hasSelectedBank ? select.value : "";
+    state.settings.selectedBankId = state.settings.selectedBranchId;
     select.disabled = false;
-    state.elements.changeNote.disabled = false;
+    state.elements.changeNote.disabled = !hasSelectedBank;
     state.elements.toggleBranch.disabled = false;
     updateBranchLabel();
     renderBankInfo();
+
+    if (!hasSelectedBank) {
+      clearQrDisplay();
+      setStatus("Chọn chi nhánh nhận tiền để tạo QR.", "");
+      return;
+    }
 
     if (!state.elements.note.value) {
       var existingNote = getExistingTransferNote(getActiveScope());
@@ -1286,6 +1339,37 @@
     updateBranchLabel();
   }
 
+  function clearQrDisplay() {
+    if (!state.elements || !state.elements.panel) {
+      return;
+    }
+
+    state.elements.panel.dataset.gvqNote = "";
+    state.elements.panel.dataset.gvqAmount = "";
+    state.elements.note.value = "";
+    state.elements.noteText.textContent = "--";
+    state.elements.noteWarningCode.textContent = "--";
+    state.elements.noteWarning.classList.remove("gvq-show");
+    state.elements.qrImg.removeAttribute("src");
+    state.elements.qrLink.href = "#";
+    state.elements.qrWrap.classList.remove("gvq-show");
+  }
+
+  function clearGeneratedSiteNote(scope) {
+    var textarea = findNoteTextarea(scope || getActiveScope());
+    if (!textarea) {
+      return false;
+    }
+
+    if (!getCanonicalTransferNote(textarea.value || "")) {
+      return false;
+    }
+
+    setNativeValue(textarea, "");
+    dispatchInputEvents(textarea, "");
+    return true;
+  }
+
   function updateBranchLabel() {
     if (!state.elements.branchLabel) {
       return;
@@ -1294,7 +1378,14 @@
     var bank = getSelectedBank();
     if (!bank) {
       state.elements.branchLabel.textContent = "Chưa chọn chi nhánh";
+      if (state.elements.toggleBranch) {
+        state.elements.toggleBranch.textContent = "Chọn";
+      }
       return;
+    }
+
+    if (state.elements.toggleBranch) {
+      state.elements.toggleBranch.textContent = "Thay đổi";
     }
 
     state.elements.branchLabel.textContent = [
@@ -1317,7 +1408,8 @@
 
     var bank = getSelectedBank();
     if (!bank) {
-      setStatus("Hãy chọn ngân hàng nhận tiền.", "error");
+      clearQrDisplay();
+      setStatus("Hãy chọn chi nhánh nhận tiền để tạo QR.", "error");
       return;
     }
 

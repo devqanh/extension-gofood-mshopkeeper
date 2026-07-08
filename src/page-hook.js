@@ -181,9 +181,9 @@
 
     try {
       var parsed = new URL(normalized);
-      return parsed.pathname.indexOf("/sainvoice/save-sync") >= 0;
+      return parsed.pathname === "/salecloud/uploadg2/sainvoice/save-sync";
     } catch (error) {
-      return normalized.indexOf("/sainvoice/save-sync") >= 0;
+      return normalized.indexOf("/salecloud/uploadg2/sainvoice/save-sync") >= 0;
     }
   }
 

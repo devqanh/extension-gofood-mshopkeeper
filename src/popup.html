@@ -30,6 +30,20 @@
 
       <div id="bank-info" class="bank-info">Chưa có dữ liệu ngân hàng.</div>
       <div id="status" class="status" role="status"></div>
+
+      <section class="refs-panel" aria-label="Danh sách RefNo đã lưu">
+        <div class="refs-header">
+          <h2>RefNo đã lưu</h2>
+          <button id="refresh-refs" class="small-button" type="button">Tải lại</button>
+        </div>
+        <div id="refs-list" class="refs-list">Chưa có dữ liệu.</div>
+        <div class="refs-pager">
+          <button id="refs-prev" class="small-button secondary" type="button">Trước</button>
+          <span id="refs-page">Trang 1/1</span>
+          <button id="refs-next" class="small-button secondary" type="button">Sau</button>
+        </div>
+        <div id="refs-status" class="status" role="status"></div>
+      </section>
     </main>
 
     <script src="popup.js"></script>

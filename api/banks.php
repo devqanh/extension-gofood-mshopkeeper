@@ -26,6 +26,8 @@ if ($method !== 'GET') {
 
 $config = require __DIR__ . '/config.php';
 
+$apiBaseUrl = get_api_base_url();
+
 $banks = array_values(array_filter($config['banks'] ?? [], static function (array $bank): bool {
     return ($bank['active'] ?? true) === true
         && !empty($bank['bank_id'])
@@ -56,5 +58,26 @@ echo json_encode([
         'uppercase' => (bool) ($config['note']['uppercase'] ?? true),
         'autoOrderCode' => (bool) ($config['note']['auto_order_code'] ?? false),
     ],
+    'endpoints' => [
+        'invoiceRefs' => $apiBaseUrl . 'invoice-refs.php',
+    ],
     'banks' => $payloadBanks,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+function get_api_base_url(): string
+{
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+    $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+
+    if ($host === '' || $scriptName === '') {
+        return '';
+    }
+
+    $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    $scheme = $isHttps ? 'https' : 'http';
+    $dir = str_replace('\\', '/', dirname($scriptName));
+    $dir = trim($dir, '/.');
+
+    return $scheme . '://' . $host . ($dir !== '' ? '/' . $dir : '') . '/';
+}

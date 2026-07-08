@@ -74,6 +74,43 @@ Extension inject `src/page-hook.js` vào page context để bắt response của
 
 Khi hệ thống gọi API này, ví dụ sau khi bấm `Lưu tạm (F10)`, extension đọc được JSON response như `Code`, `Success`, `Data.RefNo`. Response cuối cùng được lưu vào `chrome.storage.local.lastSaveSyncResponse`, đồng thời log ra Console với prefix `[GoFood VietQR]`.
 
+Từ bản `1.0.2`, extension bắt đúng endpoint:
+
+```text
+/salecloud/uploadg2/SAInvoice/save-sync
+```
+
+Khi response có dạng:
+
+```json
+{
+  "Code": 200,
+  "Data": {
+    "RefNo": "2607010019"
+  },
+  "Total": 0,
+  "Success": true,
+  "OtherData": []
+}
+```
+
+extension sẽ lấy `Data.RefNo`, ghép với nội dung chuyển khoản đang có trong ghi chú, ví dụ `GOFOOD260708154412`, rồi gửi về API PHP:
+
+```text
+POST /invoice-refs.php
+```
+
+Endpoint này lưu mapping `RefNo` ↔ `transferNote` vào `api/data/invoice-refs.json`. Hosting cần cấp quyền ghi cho thư mục `api` hoặc thư mục `api/data`.
+
+Xem danh sách có phân trang:
+
+```text
+GET /invoice-refs.php?page=1&perPage=20
+GET /invoice-refs.php?page=1&perPage=20&q=GOFOOD260708154412
+```
+
+Popup extension cũng có khung `RefNo đã lưu` để tải nhanh danh sách này.
+
 ## Ghi chú VietQR
 
 Quick Link đang được tạo theo mẫu:

@@ -21,7 +21,7 @@
     generatedNoteCodes: {},
     lastNoteEpochSecond: 0,
     lastSaveSyncResponse: null,
-    lastSaveSyncAlertKey: "",
+    lastInvoiceRefSaveKey: "",
     elements: {}
   };
 
@@ -98,7 +98,7 @@
 
     state.lastSaveSyncResponse = response;
     attachSaveSyncResponseToPanel(response);
-    alertSaveSyncResponse(response);
+    sendInvoiceRefToApi(response);
     storageSet("local", {
       lastSaveSyncResponse: response
     });
@@ -126,26 +126,6 @@
       bodyJson: json,
       bodyText: String(payload.bodyText || "").slice(0, 4000)
     };
-  }
-
-  function alertSaveSyncResponse(response) {
-    var alertKey = [
-      response.status || "",
-      response.refNo || "",
-      response.bodyText || ""
-    ].join("|").slice(0, 500);
-
-    if (alertKey && alertKey === state.lastSaveSyncAlertKey) {
-      return;
-    }
-
-    state.lastSaveSyncAlertKey = alertKey;
-
-    window.alert(
-      response.refNo
-        ? "Bắt được save-sync RefNo: " + response.refNo
-        : "Bắt được save-sync nhưng không thấy RefNo. HTTP status: " + (response.status || "unknown")
-    );
   }
 
   function extractSaveSyncRefNo(json) {
@@ -185,6 +165,152 @@
         response.success ? "ok" : "error"
       );
     }
+  }
+
+  function sendInvoiceRefToApi(response) {
+    var endpoint = getInvoiceRefsEndpoint();
+    var transferNote = detectCurrentTransferNote();
+
+    if (!response.refNo || !transferNote || !endpoint) {
+      if (state.elements.status && response.refNo && !transferNote) {
+        setStatus("Đã bắt RefNo nhưng chưa tìm thấy mã GOFOOD trong ghi chú.", "error");
+      }
+      return;
+    }
+
+    var amount = detectCurrentAmount();
+    var selectedBank = getSelectedBank();
+    var saveKey = response.refNo + "|" + transferNote;
+
+    if (saveKey === state.lastInvoiceRefSaveKey) {
+      return;
+    }
+
+    state.lastInvoiceRefSaveKey = saveKey;
+
+    var payload = {
+      refNo: response.refNo,
+      transferNote: transferNote,
+      amount: amount,
+      amountText: amount ? formatAmount(amount) : "",
+      bankId: selectedBank ? selectedBank.bankId : "",
+      bankAccountNo: selectedBank ? selectedBank.accountNo : "",
+      bankAccountName: selectedBank ? selectedBank.accountName : "",
+      sourceUrl: window.location.href,
+      saveSyncStatus: response.status,
+      saveSyncSuccess: response.success,
+      saveSyncResponse: {
+        Code: response.code,
+        Data: response.data,
+        Success: response.success
+      },
+      capturedAt: response.capturedAt
+    };
+
+    fetch(endpoint, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    }).then(function (apiResponse) {
+      if (!apiResponse.ok) {
+        throw new Error("API lưu RefNo trả về HTTP " + apiResponse.status + ".");
+      }
+      return apiResponse.json();
+    }).then(function (json) {
+      if (!json || json.ok === false) {
+        throw new Error(json && json.error ? json.error : "API không lưu được RefNo.");
+      }
+
+      storageSet("local", {
+        lastInvoiceRefMapping: json.item || payload
+      });
+
+      if (state.elements.status) {
+        setStatus("Đã lưu RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
+      }
+    }).catch(function (error) {
+      state.lastInvoiceRefSaveKey = "";
+      if (state.elements.status) {
+        setStatus(error.message, "error");
+      }
+      if (window.console && typeof window.console.warn === "function") {
+        window.console.warn("[GoFood VietQR] Không lưu được RefNo:", error);
+      }
+    });
+  }
+
+  function getInvoiceRefsEndpoint() {
+    var endpoints = state.config && state.config.endpoints ? state.config.endpoints : {};
+    var configured = endpoints.invoiceRefs || endpoints.invoice_refs || endpoints.saveRef || endpoints.save_ref;
+    var apiUrl = state.settings && state.settings.apiUrl ? state.settings.apiUrl : "";
+
+    if (configured) {
+      try {
+        return new URL(String(configured), apiUrl || window.location.href).toString();
+      } catch (error) {
+        return String(configured);
+      }
+    }
+
+    if (!apiUrl) {
+      return "";
+    }
+
+    try {
+      return new URL("invoice-refs.php", apiUrl).toString();
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function detectCurrentTransferNote() {
+    var panel = state.elements.panel && state.elements.panel.isConnected ? state.elements.panel : null;
+    if (panel && panel.dataset.gvqNote) {
+      return getCanonicalTransferNote(panel.dataset.gvqNote) || "";
+    }
+
+    var scopes = [
+      state.activeScope,
+      state.lastInteractedScope,
+      getActiveScope(),
+      findPaymentScope({ ignoreLast: true })
+    ];
+
+    for (var i = 0; i < scopes.length; i += 1) {
+      var scope = scopes[i];
+      var note = scope ? getExistingTransferNote(scope) : "";
+      if (note) {
+        return note;
+      }
+    }
+
+    var panels = Array.prototype.slice.call(document.querySelectorAll("." + PANEL_CLASS))
+      .filter(isVisible)
+      .sort(function (a, b) {
+        return visibleScore(b) - visibleScore(a);
+      });
+
+    for (var panelIndex = 0; panelIndex < panels.length; panelIndex += 1) {
+      var panelNote = getCanonicalTransferNote(panels[panelIndex].dataset.gvqNote || "");
+      if (panelNote) {
+        return panelNote;
+      }
+    }
+
+    return "";
+  }
+
+  function detectCurrentAmount() {
+    var panel = state.elements.panel && state.elements.panel.isConnected ? state.elements.panel : null;
+    if (panel && panel.dataset.gvqAmount) {
+      return normalizeAmount(panel.dataset.gvqAmount);
+    }
+
+    return detectAmountFromPage();
   }
 
   function bindOrderChangeCleanup() {
@@ -1232,6 +1358,7 @@
       ok: raw.ok !== false,
       defaults: raw.defaults || {},
       note: raw.note || {},
+      endpoints: raw.endpoints || {},
       banks: normalizedBanks
     };
   }
@@ -1241,7 +1368,9 @@
   }
 
   function getSelectedBank() {
-    var selectedId = state.elements.bank.value || state.settings.selectedBankId;
+    var selectedId = state.elements.bank && state.elements.bank.value
+      ? state.elements.bank.value
+      : state.settings.selectedBankId;
     return getBanks().find(function (bank) {
       return bank.id === selectedId;
     }) || null;

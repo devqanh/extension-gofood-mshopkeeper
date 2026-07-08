@@ -833,10 +833,38 @@
 
     if (!panel.dataset.gvqBound) {
       panel.dataset.gvqBound = "true";
-      state.elements.changeNote.addEventListener("click", function () {
+      state.elements.changeNote.addEventListener("click", function (event) {
+        var button = event.currentTarget;
+        var now = Date.now();
+        var lockedUntil = Number(panel.dataset.gvqChangeNoteLockedUntil || 0);
+
+        if (button.disabled || lockedUntil > now) {
+          return;
+        }
+
+        panel.dataset.gvqChangeNoteLockedUntil = String(now + 2000);
+        button.disabled = true;
+        button.classList.add("gvq-refreshing");
         state.activeScope = scope;
         activateEmbeddedPanel(scope);
         handleGenerate({ refreshAmount: true, newNote: true });
+
+        if (state.elements.changeNote) {
+          state.elements.changeNote.disabled = true;
+          state.elements.changeNote.classList.add("gvq-refreshing");
+        }
+
+        window.setTimeout(function () {
+          delete panel.dataset.gvqChangeNoteLockedUntil;
+
+          var currentButton = panel.querySelector(".gvq-change-note");
+          if (!currentButton || !currentButton.isConnected) {
+            return;
+          }
+
+          currentButton.disabled = !getBanks().length;
+          currentButton.classList.remove("gvq-refreshing");
+        }, 2000);
       });
     }
   }
@@ -856,11 +884,16 @@
       '    Lưu ý: không xoá mã <strong class="gvq-note-warning-code">--</strong> trong mục ghi chú để kế toán tra soát dữ liệu.',
       '  </div>',
       '  <div class="gvq-qr-wrap">',
+      '    <button class="gvq-icon-button gvq-change-note" type="button" title="Đổi nội dung chuyển khoản" aria-label="Đổi nội dung chuyển khoản">',
+      '      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+      '        <path d="M21 12a9 9 0 1 1-2.64-6.36" />',
+      '        <path d="M21 3v6h-6" />',
+      '      </svg>',
+      '    </button>',
       '    <a class="gvq-qr-link" href="#" target="_blank" rel="noopener noreferrer">',
       '      <img class="gvq-qr-img" alt="Mã QR VietQR" />',
       '    </a>',
       '  </div>',
-      '  <button class="gvq-button gvq-change-note" type="button">Đổi nội dung</button>',
       '  <div class="gvq-bank-info gvq-hidden-control"></div>',
       '  <strong class="gvq-amount-text gvq-hidden-control">--</strong>',
       '  <strong class="gvq-note-text gvq-hidden-control">--</strong>',

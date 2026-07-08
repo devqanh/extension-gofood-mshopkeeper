@@ -69,18 +69,25 @@
           }
 
           if (branchSelectionChanged) {
-            refreshQrForSelectedBranch();
+            refreshQrForSelectedBranch({ force: true });
           }
         });
       });
     }
   }
 
-  function refreshQrForSelectedBranch() {
+  function refreshQrForSelectedBranch(options) {
+    var force = options && options.force;
     var selectedBranchId = state.settings.selectedBranchId || state.settings.selectedBankId || "";
     var now = Date.now();
+    var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true });
 
-    if (selectedBranchId
+    if (!scope) {
+      return;
+    }
+
+    if (!force
+      && selectedBranchId
       && state.lastBranchRefreshId === selectedBranchId
       && now - state.lastBranchRefreshAt < 800) {
       return;
@@ -88,12 +95,6 @@
 
     state.lastBranchRefreshId = selectedBranchId;
     state.lastBranchRefreshAt = now;
-
-    var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true });
-
-    if (!scope) {
-      return;
-    }
 
     state.activeScope = scope;
     state.lastInteractedScope = scope;
@@ -968,8 +969,10 @@
         picker.setAttribute("hidden", "");
         toggle.setAttribute("aria-expanded", "false");
 
+        refreshQrForSelectedBranch({ force: true });
+
         storageSet("sync", state.settings).then(function () {
-          refreshQrForSelectedBranch();
+          refreshQrForSelectedBranch({ force: true });
         });
       });
     }

@@ -3,13 +3,15 @@
 
   var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
   var BRANCH_SELECTION_RESET_VERSION = "2026-07-08-clear-default-branch";
+  var PRIVACY_CONSENT_VERSION = "2026-07-09-v1";
 
   var state = {
     settings: {
       selectedBankId: "",
       selectedBranchId: ""
     },
-    config: null
+    config: null,
+    privacyConsentAccepted: false
   };
 
   var elements = {};
@@ -22,9 +24,13 @@
     elements.bankSelect = document.getElementById("bank-select");
     elements.bankInfo = document.getElementById("bank-info");
     elements.status = document.getElementById("status");
+    elements.privacyConsent = document.getElementById("privacy-consent");
+    elements.settingsPanel = document.getElementById("settings-panel");
+    elements.acceptPrivacy = document.getElementById("accept-privacy");
 
     elements.loadApi.addEventListener("click", loadBranches);
     elements.save.addEventListener("click", saveSettings);
+    elements.acceptPrivacy.addEventListener("click", acceptPrivacyConsent);
     elements.bankSelect.addEventListener("change", function () {
       state.settings.selectedBranchId = elements.bankSelect.value || "";
       state.settings.selectedBankId = state.settings.selectedBranchId;
@@ -34,7 +40,60 @@
       });
     });
 
-    Promise.all([
+    loadPrivacyConsent();
+  }
+
+  function loadPrivacyConsent() {
+    storageGet("local", {
+      privacyConsentAccepted: false,
+      privacyConsentVersion: ""
+    }).then(function (localState) {
+      state.privacyConsentAccepted = localState.privacyConsentAccepted === true
+        && localState.privacyConsentVersion === PRIVACY_CONSENT_VERSION;
+      renderPrivacyGate();
+
+      if (!state.privacyConsentAccepted) {
+        return null;
+      }
+
+      return initializeSettings();
+    }).catch(function (error) {
+      renderPrivacyGate();
+      setStatus(error.message, "error");
+    });
+  }
+
+  function acceptPrivacyConsent() {
+    elements.acceptPrivacy.disabled = true;
+
+    storageSet("local", {
+      privacyConsentAccepted: true,
+      privacyConsentVersion: PRIVACY_CONSENT_VERSION,
+      privacyConsentAcceptedAt: new Date().toISOString()
+    }).then(function () {
+      state.privacyConsentAccepted = true;
+      renderPrivacyGate();
+      return initializeSettings();
+    }).catch(function (error) {
+      state.privacyConsentAccepted = false;
+      renderPrivacyGate();
+      setStatus(error.message, "error");
+    }).finally(function () {
+      elements.acceptPrivacy.disabled = false;
+    });
+  }
+
+  function renderPrivacyGate() {
+    elements.privacyConsent.hidden = state.privacyConsentAccepted;
+    elements.settingsPanel.hidden = !state.privacyConsentAccepted;
+  }
+
+  function initializeSettings() {
+    if (!state.privacyConsentAccepted) {
+      return Promise.resolve();
+    }
+
+    return Promise.all([
       storageGet("sync", {
         selectedBankId: "",
         selectedBranchId: ""

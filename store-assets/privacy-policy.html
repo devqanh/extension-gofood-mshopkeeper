@@ -3,8 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Chính sách quyền riêng tư của tiện ích GoFood VietQR Helper." />
     <title>Chính sách quyền riêng tư - GoFood VietQR Helper</title>
     <style>
+      * {
+        box-sizing: border-box;
+        letter-spacing: 0;
+      }
       body {
         margin: 0;
         color: #18212b;
@@ -12,48 +17,105 @@
         font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       main {
-        width: min(760px, calc(100% - 40px));
-        margin: 48px auto;
+        width: min(820px, calc(100% - 32px));
+        margin: 40px auto;
         padding: 32px;
         background: #fff;
         border: 1px solid #dce3e8;
         border-radius: 8px;
       }
       h1, h2 {
-        line-height: 1.25;
+        color: #101820;
+        line-height: 1.3;
       }
       h1 {
-        margin-top: 0;
+        margin: 0 0 8px;
+        font-size: 30px;
+      }
+      h2 {
+        margin: 28px 0 8px;
+        font-size: 20px;
+      }
+      p, ul {
+        margin: 8px 0;
+      }
+      .updated {
+        color: #60717d;
+        font-size: 14px;
+      }
+      .notice {
+        margin: 24px 0;
+        padding: 16px;
+        color: #173d32;
+        background: #edf9f4;
+        border: 1px solid #9ed8c5;
+        border-radius: 6px;
       }
       a {
         color: #087f5b;
+      }
+      code {
+        overflow-wrap: anywhere;
       }
     </style>
   </head>
   <body>
     <main>
       <h1>Chính sách quyền riêng tư</h1>
-      <p><strong>GoFood VietQR Helper</strong> hỗ trợ tạo VietQR và đồng bộ dữ liệu đối soát cho hóa đơn trên MShopKeeper.</p>
+      <p><strong>Sản phẩm:</strong> GoFood VietQR Helper</p>
+      <p class="updated">Có hiệu lực và cập nhật lần cuối: 09/07/2026</p>
 
-      <h2>Dữ liệu được xử lý</h2>
-      <p>Extension xử lý RefNo hóa đơn, mã chuyển khoản, số tiền, phương thức thanh toán, chi nhánh và tài khoản nhận tiền, URL trang bán hàng cùng thời điểm thao tác.</p>
+      <div class="notice">
+        <strong>Thông báo nổi bật:</strong>
+        GoFood VietQR Helper chỉ bắt đầu đọc dữ liệu hóa đơn và truyền dữ liệu sau khi người dùng xem thông báo trong popup của extension và bấm “Đồng ý và tiếp tục”.
+      </div>
 
-      <h2>Mục đích sử dụng</h2>
-      <p>Dữ liệu chỉ được dùng để tạo mã thanh toán VietQR, liên kết giao dịch với hóa đơn và hỗ trợ kế toán tra soát.</p>
+      <h2>1. Phạm vi và mục đích</h2>
+      <p>Extension hỗ trợ thu ngân trên MShopKeeper bằng cách tạo mã VietQR theo hóa đơn, điền mã chuyển khoản và đồng bộ dữ liệu cần thiết để kế toán đối soát. Dữ liệu chỉ được xử lý nhằm cung cấp chức năng này.</p>
 
-      <h2>Lưu trữ và truyền dữ liệu</h2>
-      <p>Cấu hình chi nhánh và trạng thái gần nhất được lưu bằng Chrome Storage. Dữ liệu đối soát được truyền qua HTTPS tới <code>gofood.dewa.vn</code>. Ảnh QR được tải từ <code>img.vietqr.io</code>.</p>
+      <h2>2. Dữ liệu được xử lý</h2>
+      <ul>
+        <li>Dữ liệu hóa đơn hiển thị trên MShopKeeper: RefNo, mã chuyển khoản, số tiền còn phải thu, số tiền chuyển khoản, số tiền mặt và phương thức thanh toán.</li>
+        <li>Cấu hình chi nhánh nhận tiền: mã và tên chi nhánh, ngân hàng, tên chủ tài khoản, số tài khoản và tiền tố nội dung chuyển khoản.</li>
+        <li>Dữ liệu kỹ thuật tối thiểu: thời điểm đồng bộ, trạng thái phản hồi lưu hóa đơn và phiên bản chấp thuận chính sách.</li>
+      </ul>
+      <p>Extension không thu thập mật khẩu, cookie xác thực, nội dung liên lạc cá nhân, vị trí, dữ liệu sức khỏe hoặc dữ liệu phục vụ quảng cáo.</p>
 
-      <h2>Chia sẻ dữ liệu</h2>
-      <p>Chúng tôi không bán dữ liệu, không dùng dữ liệu cho quảng cáo và không chia sẻ dữ liệu cho mục đích không liên quan đến chức năng của extension.</p>
+      <h2>3. Cách sử dụng dữ liệu</h2>
+      <ul>
+        <li>Tạo ảnh QR có đúng tài khoản nhận tiền, số tiền và mã chuyển khoản.</li>
+        <li>Liên kết giao dịch với RefNo hóa đơn để kế toán tra soát.</li>
+        <li>Duy trì chi nhánh nhận tiền mà người dùng đã chọn.</li>
+        <li>Phát hiện và xử lý lỗi đồng bộ liên quan trực tiếp đến chức năng thanh toán.</li>
+      </ul>
 
-      <h2>Kiểm soát của người dùng</h2>
-      <p>Người dùng có thể ngừng xử lý dữ liệu bằng cách tắt hoặc gỡ extension. Dữ liệu cục bộ có thể được xóa bằng cách xóa dữ liệu extension trong Chrome.</p>
+      <h2>4. Truyền và chia sẻ dữ liệu</h2>
+      <p>Dữ liệu được truyền qua HTTPS tới các dịch vụ sau:</p>
+      <ul>
+        <li><code>https://gofood.dewa.vn</code>: nhận cấu hình chi nhánh và dữ liệu đối soát hóa đơn.</li>
+        <li><code>https://img.vietqr.io</code>: nhận mã ngân hàng, số tài khoản, tên tài khoản, số tiền và mã chuyển khoản để tạo ảnh VietQR.</li>
+      </ul>
+      <p>Chúng tôi không bán dữ liệu, không dùng dữ liệu cho quảng cáo, chấm điểm tín dụng hoặc tiếp thị cá nhân hóa. Dữ liệu không được chuyển cho bên thứ ba ngoài phạm vi cần thiết để tạo QR, vận hành đối soát, bảo đảm an toàn hoặc tuân thủ pháp luật.</p>
 
-      <h2>Liên hệ</h2>
-      <p>Mọi yêu cầu liên quan đến dữ liệu và quyền riêng tư được tiếp nhận tại <a href="https://gofood.dewa.vn">gofood.dewa.vn</a>.</p>
+      <h2>5. Lưu trữ và thời hạn</h2>
+      <p>Chrome Storage lưu trạng thái đồng ý, chi nhánh đã chọn, cấu hình chi nhánh đã tải và trạng thái đồng bộ gần nhất. Người dùng có thể xóa dữ liệu cục bộ bằng cách xóa dữ liệu hoặc gỡ extension.</p>
+      <p>Dữ liệu đối soát trên máy chủ chỉ được lưu trong thời gian cần thiết cho nghiệp vụ kế toán, giải quyết sự cố và nghĩa vụ pháp lý áp dụng; sau đó dữ liệu được xóa hoặc ẩn danh.</p>
 
-      <p>Cập nhật lần cuối: 08/07/2026.</p>
+      <h2>6. Bảo mật</h2>
+      <p>Dữ liệu truyền ra ngoài extension sử dụng HTTPS. Quyền truy cập của extension được giới hạn ở các tên miền MShopKeeper, API GoFood và dịch vụ ảnh VietQR cần cho mục đích duy nhất đã mô tả.</p>
+
+      <h2>7. Sự đồng ý và lựa chọn của người dùng</h2>
+      <p>Trước lần sử dụng đầu tiên, popup của extension hiển thị loại dữ liệu được xử lý, nơi dữ liệu được gửi và mục đích sử dụng. Nếu người dùng không bấm “Đồng ý và tiếp tục”, extension không đọc hóa đơn, không tạo QR và không gửi dữ liệu.</p>
+      <p>Người dùng có thể ngừng việc xử lý bằng cách tắt hoặc gỡ extension và có thể yêu cầu xóa dữ liệu máy chủ qua kênh liên hệ bên dưới.</p>
+
+      <h2>8. Tuân thủ Limited Use</h2>
+      <p>Việc sử dụng và chuyển dữ liệu nhận từ các API của Chrome tuân thủ Chính sách dữ liệu người dùng của Chrome Web Store, bao gồm các yêu cầu về Limited Use. Dữ liệu chỉ được sử dụng để cung cấp hoặc cải thiện chức năng người dùng đã yêu cầu.</p>
+
+      <h2>9. Thay đổi chính sách</h2>
+      <p>Khi có thay đổi quan trọng về loại dữ liệu hoặc mục đích xử lý, chính sách này sẽ được cập nhật và extension sẽ yêu cầu người dùng chấp thuận lại trước khi tiếp tục xử lý dữ liệu.</p>
+
+      <h2>10. Liên hệ</h2>
+      <p>Yêu cầu về quyền riêng tư, truy cập hoặc xóa dữ liệu có thể được gửi qua website <a href="https://gofood.dewa.vn">https://gofood.dewa.vn</a>.</p>
     </main>
   </body>
 </html>

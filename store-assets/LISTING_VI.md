@@ -12,6 +12,8 @@ Tự tạo VietQR theo hóa đơn MShopKeeper, điền nội dung chuyển kho�
 
 GoFood VietQR Helper hỗ trợ quy trình thu ngân trên các website `*.mshopkeeper.vn`.
 
+**Thông báo về dữ liệu:** Sau khi người dùng đồng ý trong popup, extension đọc RefNo, mã chuyển khoản, số tiền và phương thức thanh toán của hóa đơn. Dữ liệu đối soát được gửi qua HTTPS tới `gofood.dewa.vn`. Thông tin tài khoản nhận tiền, số tiền và mã chuyển khoản được gửi tới `img.vietqr.io` để tạo ảnh QR. Dữ liệu chỉ dùng cho thanh toán và kế toán tra soát, không dùng cho quảng cáo hoặc bán cho bên thứ ba.
+
 Tính năng chính:
 
 - Tự lấy số tiền chuyển khoản hoặc số tiền còn phải thu của hóa đơn hiện tại.
@@ -55,4 +57,4 @@ Dữ liệu không được bán, không dùng cho quảng cáo và không chuy�
 
 Đăng file `privacy-policy.html` lên:
 
-`https://gofood.dewa.vn/privacy-policy`
+`https://gofood.dewa.vn/privacy-policy.html`

@@ -13,18 +13,45 @@
         <p>Chọn chi nhánh nhận chuyển khoản mặc định.</p>
       </header>
 
-      <div class="button-row">
-        <button id="load-api" class="button" type="button">Tải chi nhánh</button>
-        <button id="save" class="button secondary" type="button">Lưu</button>
-      </div>
+      <section id="privacy-consent" class="privacy-consent" hidden>
+        <h2>Thông báo về dữ liệu</h2>
+        <p>
+          Để tạo QR và đối soát hóa đơn, extension sẽ đọc RefNo, mã chuyển khoản,
+          số tiền và phương thức thanh toán trên MShopKeeper.
+        </p>
+        <p>
+          Dữ liệu đối soát được gửi qua HTTPS tới <strong>gofood.dewa.vn</strong>.
+          Thông tin tài khoản, số tiền và mã chuyển khoản được gửi tới
+          <strong>img.vietqr.io</strong> để tạo ảnh QR.
+        </p>
+        <p>Dữ liệu chỉ dùng cho thanh toán và kế toán tra soát, không dùng cho quảng cáo hoặc bán cho bên thứ ba.</p>
+        <a href="https://gofood.dewa.vn/privacy-policy.html" target="_blank" rel="noopener noreferrer">
+          Xem chính sách quyền riêng tư
+        </a>
+        <button id="accept-privacy" class="button consent-button" type="button">
+          Đồng ý và tiếp tục
+        </button>
+        <small>Nếu không đồng ý, extension sẽ không đọc hóa đơn, tạo QR hoặc gửi dữ liệu.</small>
+      </section>
 
-      <label class="field">
-        <span>Chi nhánh mặc định</span>
-        <select id="bank-select"></select>
-      </label>
+      <section id="settings-panel" class="settings-panel" hidden>
+        <div class="button-row">
+          <button id="load-api" class="button" type="button">Tải chi nhánh</button>
+          <button id="save" class="button secondary" type="button">Lưu</button>
+        </div>
 
-      <div id="bank-info" class="bank-info">Chưa có dữ liệu ngân hàng.</div>
-      <div id="status" class="status" role="status"></div>
+        <label class="field">
+          <span>Chi nhánh mặc định</span>
+          <select id="bank-select"></select>
+        </label>
+
+        <div id="bank-info" class="bank-info">Chưa có dữ liệu ngân hàng.</div>
+        <div id="status" class="status" role="status"></div>
+
+        <a class="privacy-link" href="https://gofood.dewa.vn/privacy-policy.html" target="_blank" rel="noopener noreferrer">
+          Chính sách quyền riêng tư
+        </a>
+      </section>
 
     </main>
 

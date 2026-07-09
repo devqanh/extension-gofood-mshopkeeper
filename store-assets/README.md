@@ -5,6 +5,7 @@
 - `screenshot-01-vietqr-1280x800.png`: screenshot tính năng bắt buộc.
 - `LISTING_VI.md`: nội dung listing và giải trình quyền.
 - `privacy-policy.html`: nội dung cần đăng công khai tại URL Privacy policy.
+- `PRIVACY_REJECTION_FIX.md`: checklist khắc phục Purple Nickel trước khi gửi lại.
 
 Icon nằm trong `assets/icons` và được khai báo trực tiếp trong `manifest.json`.
 

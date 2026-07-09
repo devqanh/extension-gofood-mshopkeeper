@@ -9,9 +9,12 @@
   var SAVE_SYNC_MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
   var API_REQUEST_MESSAGE_TYPE = "GOFOOD_VIETQR_API_REQUEST";
   var BRANCH_SELECTION_RESET_VERSION = "2026-07-08-clear-default-branch";
+  var PRIVACY_CONSENT_VERSION = "2026-07-09-v1";
 
   var state = {
     config: null,
+    featuresStarted: false,
+    privacyConsentAccepted: false,
     settings: {
       selectedBankId: "",
       selectedBranchId: ""
@@ -37,6 +40,55 @@
   init();
 
   function init() {
+    bindPrivacyConsentLifecycle();
+
+    storageGet("local", {
+      privacyConsentAccepted: false,
+      privacyConsentVersion: ""
+    }).then(function (localState) {
+      state.privacyConsentAccepted = hasValidPrivacyConsent(localState);
+      if (state.privacyConsentAccepted) {
+        startFeatures();
+      }
+    });
+  }
+
+  function bindPrivacyConsentLifecycle() {
+    if (!chrome || !chrome.storage || !chrome.storage.onChanged) {
+      return;
+    }
+
+    chrome.storage.onChanged.addListener(function (changes, areaName) {
+      if (areaName !== "local" || !changes.privacyConsentAccepted) {
+        return;
+      }
+
+      storageGet("local", {
+        privacyConsentAccepted: false,
+        privacyConsentVersion: ""
+      }).then(function (localState) {
+        state.privacyConsentAccepted = hasValidPrivacyConsent(localState);
+        if (state.privacyConsentAccepted) {
+          startFeatures();
+        }
+      });
+    });
+  }
+
+  function hasValidPrivacyConsent(localState) {
+    return Boolean(
+      localState
+      && localState.privacyConsentAccepted === true
+      && localState.privacyConsentVersion === PRIVACY_CONSENT_VERSION
+    );
+  }
+
+  function startFeatures() {
+    if (state.featuresStarted || !state.privacyConsentAccepted) {
+      return;
+    }
+
+    state.featuresStarted = true;
     injectPageNetworkHook();
     bindSaveSyncResponseCapture();
     bindOrderChangeCleanup();
@@ -150,6 +202,10 @@
   }
 
   function handleSaveSyncResponse(payload) {
+    if (!state.privacyConsentAccepted) {
+      return;
+    }
+
     var response = normalizeSaveSyncResponse(payload);
     if (!response) {
       return;
@@ -175,15 +231,11 @@
       capturedAt: payload.capturedAt || new Date().toISOString(),
       source: payload.source || "",
       method: payload.method || "",
-      url: payload.url || "",
       status: Number(payload.status || 0),
       ok: payload.ok !== false,
       success: json ? json.Success === true || json.success === true : Boolean(payload.ok),
       refNo: refNo,
-      code: json ? json.Code || json.code || null : null,
-      data: json ? json.Data || json.data || null : null,
-      bodyJson: json,
-      bodyText: String(payload.bodyText || "").slice(0, 4000)
+      code: json ? json.Code || json.code || null : null
     };
   }
 
@@ -227,6 +279,10 @@
   }
 
   function sendTransactionSyncToApi(response) {
+    if (!state.privacyConsentAccepted) {
+      return;
+    }
+
     var endpoint = getApiUrl("/api/transactions/sync");
     var transferNote = detectCurrentTransferNote();
 
@@ -269,15 +325,14 @@
       bankName: selectedBank ? selectedBank.bankName || "" : "",
       bankAccountNo: selectedBank ? selectedBank.accountNo : "",
       bankAccountName: selectedBank ? selectedBank.accountName : "",
-      sourceUrl: window.location.href,
-      sourceHost: window.location.host,
-      sourcePath: window.location.pathname,
       postedAt: buildPostDateInfo(new Date()),
       saveSyncStatus: response.status,
       saveSyncSuccess: response.success,
       saveSyncResponse: {
         Code: response.code,
-        Data: response.data,
+        Data: {
+          RefNo: response.refNo
+        },
         Success: response.success
       },
       capturedAt: response.capturedAt
@@ -1211,6 +1266,10 @@
   function loadState(options) {
     var forceApi = options && options.forceApi;
 
+    if (!state.privacyConsentAccepted) {
+      return Promise.reject(new Error("Chưa có sự đồng ý xử lý dữ liệu."));
+    }
+
     return Promise.all([
       storageGet("sync", {
         selectedBankId: "",
@@ -1276,6 +1335,10 @@
   }
 
   function fetchConfig() {
+    if (!state.privacyConsentAccepted) {
+      return Promise.reject(new Error("Chưa có sự đồng ý xử lý dữ liệu."));
+    }
+
     return getApiJson(getApiUrl("/api/branches")).then(function (json) {
       return json;
     }).then(function (json) {

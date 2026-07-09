@@ -6,13 +6,15 @@ Extension Chrome này tự tạo ảnh VietQR trên các site `*.mshopkeeper.vn`
 
 Bộ icon extension nằm trong `assets/icons`. Ảnh quảng bá, screenshot, nội dung listing và mẫu chính sách quyền riêng tư nằm trong `store-assets`.
 
+Trước khi gửi Chrome Web Store, đăng `store-assets/privacy-policy.html` công khai tại `https://gofood.dewa.vn/privacy-policy.html` và kiểm tra URL trả về HTTP 200 mà không cần đăng nhập.
+
 Tạo file ZIP chỉ chứa mã extension cần upload:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.15.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.16.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 

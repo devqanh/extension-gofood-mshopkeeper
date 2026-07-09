@@ -132,18 +132,21 @@
 }
 
 .gvq-qr-link {
-  display: block;
+  display: flex;
+  justify-content: center;
   line-height: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .gvq-qr-img {
   display: block;
   height: auto;
-  max-height: 430px;
+  max-height: 360px;
   max-width: 100%;
-  min-height: 180px;
+  min-height: 0;
   object-fit: contain;
-  width: 100%;
+  width: auto;
 }
 
 .gvq-branch-panel {
@@ -285,5 +288,9 @@
 @media (max-width: 520px) {
   .gofood-vietqr-panel {
     margin-bottom: 76px;
+  }
+
+  .gvq-qr-img {
+    max-height: 330px;
   }
 }

@@ -12,7 +12,7 @@ Tạo file ZIP chỉ chứa mã extension cần upload:
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.14.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.15.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 

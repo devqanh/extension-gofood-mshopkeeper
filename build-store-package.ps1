@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $buildRoot = Join-Path $root "build"
 $stage = Join-Path $buildRoot "chrome-store-package"
-$zipPath = Join-Path $buildRoot "gofood-vietqr-helper-1.0.16.zip"
+$zipPath = Join-Path $buildRoot "gofood-vietqr-helper-1.0.17.zip"
 
 $resolvedBuildRoot = [System.IO.Path]::GetFullPath($buildRoot)
 $resolvedStage = [System.IO.Path]::GetFullPath($stage)

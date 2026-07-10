@@ -159,6 +159,11 @@
       return;
     }
 
+    if (!getTransferPaymentState(scope).hasTransferAmount) {
+      clearQrWhenNoTransfer(scope);
+      return;
+    }
+
     primeAmountField({ force: true });
     handleGenerate({
       refreshAmount: true,
@@ -294,6 +299,13 @@
     }
 
     var paymentSnapshot = buildPaymentSnapshot();
+    if (!paymentSnapshot.bankTransferAmount) {
+      if (state.elements.status) {
+        setStatus("Không gửi RefNo vì hóa đơn không có số tiền Chuyển khoản.", "");
+      }
+      return;
+    }
+
     var selectedBank = getSelectedBank();
     var saveKey = response.refNo + "|" + transferNote;
 
@@ -494,6 +506,11 @@
   }
 
   function detectCurrentAmount() {
+    var paymentState = getTransferPaymentState(getActiveScope());
+    if (paymentState.hasPaymentRows) {
+      return paymentState.amount;
+    }
+
     var panel = state.elements.panel && state.elements.panel.isConnected ? state.elements.panel : null;
     if (panel && panel.dataset.gvqAmount) {
       return normalizeAmount(panel.dataset.gvqAmount);
@@ -662,6 +679,31 @@
       paymentTotal: paymentTotalNumber > 0 ? String(paymentTotalNumber) : "",
       paymentsByType: paymentsByType
     };
+  }
+
+  function getTransferPaymentState(scope) {
+    var paymentMethods = detectPaymentMethods(scope || getActiveScope());
+    var summary = summarizePaymentMethods(paymentMethods);
+    var amount = summary.bankTransferAmount && isValidQrAmount(summary.bankTransferAmount)
+      ? summary.bankTransferAmount
+      : "";
+
+    return {
+      amount: amount,
+      hasTransferAmount: Boolean(amount),
+      hasPaymentRows: paymentMethods.length > 0,
+      hasBankTransferMethod: paymentMethods.some(function (item) {
+        return item.type === "bank_transfer";
+      }),
+      paymentMethods: paymentMethods,
+      summary: summary
+    };
+  }
+
+  function clearQrWhenNoTransfer(scope) {
+    clearGeneratedSiteNote(scope || getActiveScope());
+    clearQrDisplay();
+    setStatus("Chỉ hiện QR khi có phương thức Chuyển khoản và số tiền chuyển khoản lớn hơn 0.", "");
   }
 
   function buildPostDateInfo(date) {
@@ -855,6 +897,11 @@
         return;
       }
 
+      if (!getTransferPaymentState(scope).hasTransferAmount) {
+        clearQrWhenNoTransfer(scope);
+        return;
+      }
+
       if (!(textarea.value || "").trim()) {
         var note = buildTransferNote();
         setNativeValue(textarea, note);
@@ -874,6 +921,11 @@
     if (!getSelectedBank()) {
       clearGeneratedSiteNote(scope);
       clearQrDisplay();
+      return;
+    }
+
+    if (!getTransferPaymentState(scope).hasTransferAmount) {
+      clearQrWhenNoTransfer(scope);
       return;
     }
 
@@ -1511,13 +1563,20 @@
       return;
     }
 
+    var activeScope = getActiveScope();
+    var paymentState = getTransferPaymentState(activeScope);
+    if (!paymentState.hasTransferAmount) {
+      clearQrWhenNoTransfer(activeScope);
+      return;
+    }
+
     var noteSource = "";
     if (newNote) {
       noteSource = buildTransferNote();
     } else if (restoreExistingNote) {
-      noteSource = getExistingTransferNote(getActiveScope()) || "";
+      noteSource = getExistingTransferNote(activeScope) || "";
     } else {
-      noteSource = state.elements.note.value || getExistingTransferNote(getActiveScope()) || buildTransferNote();
+      noteSource = state.elements.note.value || getExistingTransferNote(activeScope) || buildTransferNote();
     }
 
     var note = getCanonicalTransferNote(noteSource) || sanitizeTransferNote(noteSource);
@@ -1529,14 +1588,14 @@
     }
     state.elements.note.value = note;
 
-    var amount = refreshAmount ? detectAmountFromPage() : "";
+    var amount = refreshAmount ? paymentState.amount : "";
     if (amount) {
       state.elements.amount.value = formatAmount(amount);
     }
-    if (!amount) {
+    if (!amount && !refreshAmount) {
       amount = normalizeAmount(state.elements.amount.value);
     }
-    if (!amount) {
+    if (!amount && !refreshAmount) {
       amount = detectAmountFromPage();
       if (amount) {
         state.elements.amount.value = formatAmount(amount);
@@ -1754,8 +1813,16 @@
 
   function primeAmountField(options) {
     var force = options && options.force;
+    var paymentState = getTransferPaymentState(getActiveScope());
+    if (paymentState.hasPaymentRows && !paymentState.hasTransferAmount) {
+      if (force) {
+        state.elements.amount.value = "";
+        state.elements.amountText.textContent = "--";
+      }
+      return;
+    }
 
-    var detectedAmount = detectAmountFromPage();
+    var detectedAmount = paymentState.amount || detectAmountFromPage();
     if (detectedAmount) {
       state.elements.amount.value = formatAmount(detectedAmount);
       state.elements.amountText.textContent = formatAmount(detectedAmount);
@@ -1777,9 +1844,13 @@
 
   function detectAmountFromPage() {
     var scope = getActiveScope();
-    var bankTransferAmount = detectBankTransferAmountFromPage(scope);
-    if (bankTransferAmount) {
-      return bankTransferAmount;
+    var paymentState = getTransferPaymentState(scope);
+    if (paymentState.hasTransferAmount) {
+      return paymentState.amount;
+    }
+
+    if (paymentState.hasPaymentRows) {
+      return "";
     }
 
     var receivableAmount = detectReceivableAmountFromPage(scope);
@@ -1811,16 +1882,6 @@
     }
 
     return String(Math.max.apply(Math, candidates));
-  }
-
-  function detectBankTransferAmountFromPage(scope) {
-    var paymentMethods = detectPaymentMethods(scope || document);
-    var summary = summarizePaymentMethods(paymentMethods);
-    if (summary.bankTransferAmount && isValidQrAmount(summary.bankTransferAmount)) {
-      return summary.bankTransferAmount;
-    }
-
-    return "";
   }
 
   function detectReceivableAmountFromPage(scope) {

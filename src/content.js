@@ -225,7 +225,7 @@
     });
 
     if (window.console && typeof window.console.info === "function") {
-      window.console.info("[GoFood VietQR] Bắt response hóa đơn:", response);
+      window.console.info("[GoFood VietQR] Bắt response save-sync:", response);
     }
   }
 
@@ -277,8 +277,8 @@
     if (state.elements.status) {
       setStatus(
         response.refNo
-          ? "Đã bắt response hóa đơn: " + response.refNo
-          : "Đã bắt response hóa đơn.",
+          ? "Đã bắt response save-sync: " + response.refNo
+          : "Đã bắt response save-sync.",
         response.success ? "ok" : "error"
       );
     }

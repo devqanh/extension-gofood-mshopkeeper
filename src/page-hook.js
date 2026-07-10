@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var HOOK_FLAG = "__gofoodVietqrInvoiceRefHookInstalled";
+  var HOOK_FLAG = "__gofoodVietqrSaveSyncHookInstalled";
   var MESSAGE_SOURCE = "gofood-vietqr-page-hook";
   var MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
 
@@ -32,7 +32,7 @@
     window.fetch = function () {
       var args = Array.prototype.slice.call(arguments);
       var request = getFetchRequest(args[0], args[1]);
-      var shouldCapture = shouldCaptureInvoiceRefRequest(request);
+      var shouldCapture = shouldCaptureSaveSyncRequest(request);
 
       return nativeFetch.apply(this, args).then(function (response) {
         if (shouldCapture) {
@@ -66,7 +66,7 @@
       var xhr = this;
       var request = xhr.__gofoodVietqrRequest;
 
-      if (request && shouldCaptureInvoiceRefRequest(request)) {
+      if (request && shouldCaptureSaveSyncRequest(request)) {
         xhr.addEventListener("loadend", function () {
           captureXhrResponse(xhr, request);
         });
@@ -180,23 +180,23 @@
     }
   }
 
-  function shouldCaptureInvoiceRefRequest(request) {
+  function shouldCaptureSaveSyncRequest(request) {
     var method = String(request && request.method || "GET").toUpperCase();
     if (method === "GET" || method === "HEAD") {
       return false;
     }
 
-    return isInvoiceRefCandidateUrl(request && request.url);
+    return isSaveSyncUrl(request && request.url);
   }
 
-  function isInvoiceRefCandidateUrl(url) {
+  function isSaveSyncUrl(url) {
     var normalized = normalizeUrl(url).toLowerCase();
 
     try {
       var parsed = new URL(normalized);
-      return parsed.pathname.indexOf("/salecloud/uploadg2/sainvoice/") === 0;
+      return parsed.pathname.replace(/\/+$/, "").endsWith("/save-sync");
     } catch (error) {
-      return normalized.indexOf("/salecloud/uploadg2/sainvoice/") >= 0;
+      return /\/save-sync(?:[?#]|$)/i.test(normalized);
     }
   }
 

@@ -14,7 +14,7 @@ Tạo file ZIP chỉ chứa mã extension cần upload:
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.19.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.20.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
@@ -35,7 +35,7 @@ POST /api/transactions/sync
 
 `GET /api/branches` trả danh sách chi nhánh gồm `id`, `name`, `bank_bin`, `bank_name`, `account_name`, `account_number`, `transfer_prefix`. Extension dùng dữ liệu này để chọn chi nhánh, tạo QR VietQR và sinh prefix nội dung chuyển khoản.
 
-`POST /api/transactions/sync` nhận payload sau khi MShopKeeper trả `Data.RefNo` từ các endpoint hóa đơn `SAInvoice` như `save-sync` hoặc luồng `Thu tiền`.
+`POST /api/transactions/sync` nhận payload sau khi MShopKeeper trả `Data.RefNo` từ endpoint `save-sync`.
 
 ## Cài extension
 
@@ -72,17 +72,17 @@ Nếu người dùng nhập thêm nội dung sau mã chuẩn, ví dụ `GOFOOD26
 Để tránh trùng mã khi tạo nhiều hóa đơn quá nhanh, nếu mã `YYMMDDHHMMSS` hiện tại đã được dùng trong các ô ghi chú đang mở hoặc trong phiên hiện tại, extension tự nhích sang giây kế tiếp chưa dùng.
 Block QR có thêm dòng lưu ý không xoá mã chuyển khoản trong mục ghi chú để kế toán tra soát dữ liệu.
 
-## Bắt response hóa đơn
+## Bắt response save-sync
 
-Extension inject `src/page-hook.js` vào page context để bắt response của các endpoint hóa đơn:
+Extension inject `src/page-hook.js` vào page context để bắt response của endpoint:
 
 ```text
-/SAInvoice/*
+/save-sync
 ```
 
 Khi hệ thống gọi API này, ví dụ sau khi bấm `Lưu tạm (F10)` hoặc `Thu tiền (F9)`, nếu JSON response có `Data.RefNo` thì extension mới xử lý. Response cuối cùng được lưu vào `chrome.storage.local.lastSaveSyncResponse`, đồng thời log ra Console với prefix `[GoFood VietQR]`.
 
-Extension vẫn hỗ trợ endpoint:
+Endpoint thực tế đang bắt:
 
 ```text
 /salecloud/uploadg2/SAInvoice/save-sync

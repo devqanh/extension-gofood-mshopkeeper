@@ -22,6 +22,7 @@
     activeScope: null,
     lastInteractedScope: null,
     autoNoteTimer: 0,
+    paymentAmountTimer: 0,
     autoNoteObserver: null,
     generatedNoteCodes: {},
     lastNoteEpochSecond: 0,
@@ -987,14 +988,44 @@
     state.lastInteractedScope = scope;
     if (isSystemPaymentEditControl(target)) {
       window.clearTimeout(state.autoNoteTimer);
+      if (isBankTransferAmountInput(target)) {
+        schedulePaymentAmountRefresh(scope);
+      }
       return;
     }
 
     scheduleAutoNoteForActiveScope();
   }
 
+  function schedulePaymentAmountRefresh(scope) {
+    window.clearTimeout(state.paymentAmountTimer);
+    state.paymentAmountTimer = window.setTimeout(function () {
+      if (scope && document.documentElement.contains(scope)) {
+        state.lastInteractedScope = scope;
+        state.activeScope = scope;
+      }
+
+      autoFillNoteForActiveScope({ ignoreEditing: true });
+    }, 520);
+  }
+
   function isPaymentValueElement(element) {
     return Boolean(element.closest(".type-payment-wrap, .type-payment-item"));
+  }
+
+  function isPaymentAmountInput(element) {
+    return element instanceof Element
+      && Boolean(element.closest(".type-payment-wrap, .type-payment-item"))
+      && element.matches("input[maxlength='14'], .misa-input-money input, .input-text-right input, input.text-right");
+  }
+
+  function isBankTransferAmountInput(element) {
+    if (!isPaymentAmountInput(element)) {
+      return false;
+    }
+
+    var item = element.closest(".type-payment-item");
+    return Boolean(item && classifyPaymentMethod(extractPaymentMethodName(item)) === "bank_transfer");
   }
 
   function isPaymentMethodOptionElement(element) {
@@ -1034,11 +1065,7 @@
 
   function isEditingPaymentAmountInput() {
     var active = document.activeElement;
-    if (!(active instanceof Element) || !active.closest(".type-payment-wrap, .type-payment-item")) {
-      return false;
-    }
-
-    return active.matches("input[maxlength='14'], .misa-input-money input, .input-text-right input, input.text-right");
+    return isPaymentAmountInput(active);
   }
 
   function isRelevantPaymentMutation(mutation) {

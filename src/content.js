@@ -887,7 +887,27 @@
 
     document.addEventListener("focusin", function (event) {
       var target = event.target;
-      if (target instanceof Element && findPaymentScopeFromElement(target)) {
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      var scope = findPaymentScopeFromElement(target);
+      if (!scope) {
+        return;
+      }
+
+      state.lastInteractedScope = scope;
+      if (isSystemPaymentEditControl(target)) {
+        window.clearTimeout(state.autoNoteTimer);
+        return;
+      }
+
+      scheduleAutoNoteForActiveScope();
+    }, true);
+
+    document.addEventListener("focusout", function (event) {
+      var target = event.target;
+      if (target instanceof Element && isSystemPaymentEditControl(target)) {
         scheduleAutoNoteForActiveScope();
       }
     }, true);
@@ -904,7 +924,7 @@
     state.autoNoteObserver = new MutationObserver(function (mutations) {
       var hasRelevantChange = mutations.some(isRelevantPaymentMutation);
 
-      if (hasRelevantChange) {
+      if (hasRelevantChange && !isEditingSystemPaymentControl()) {
         scheduleAutoNoteForActiveScope();
       }
     });
@@ -932,11 +952,34 @@
     }
 
     state.lastInteractedScope = scope;
+    if (isSystemPaymentEditControl(target)) {
+      window.clearTimeout(state.autoNoteTimer);
+      return;
+    }
+
     scheduleAutoNoteForActiveScope();
   }
 
   function isPaymentValueElement(element) {
     return Boolean(element.closest(".type-payment-wrap, .type-payment-item"));
+  }
+
+  function isSystemPaymentEditControl(element) {
+    if (!(element instanceof Element) || element.closest("." + PANEL_CLASS)) {
+      return false;
+    }
+
+    if (!element.closest(".type-payment-wrap, .type-payment-item")) {
+      return false;
+    }
+
+    return Boolean(element.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']"))
+      || element.matches("input, textarea, select, [contenteditable='true'], [contenteditable='']");
+  }
+
+  function isEditingSystemPaymentControl() {
+    return document.activeElement instanceof Element
+      && isSystemPaymentEditControl(document.activeElement);
   }
 
   function isRelevantPaymentMutation(mutation) {
@@ -987,6 +1030,10 @@
 
   function autoFillNoteForActiveScope() {
     Promise.resolve().then(function () {
+      if (isEditingSystemPaymentControl()) {
+        return;
+      }
+
       var scope = findPaymentScope();
       if (!scope) {
         return;

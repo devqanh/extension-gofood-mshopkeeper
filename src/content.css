@@ -215,6 +215,98 @@
   display: none;
 }
 
+.gvq-bank-options {
+  background: #f7faf9;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  max-height: 178px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.gvq-bank-filter {
+  color: #087f5b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+  padding: 2px 4px;
+  text-transform: capitalize;
+}
+
+.gvq-bank-empty {
+  color: #586977;
+  font-size: 12px;
+  line-height: 17px;
+  padding: 8px 7px;
+}
+
+.gvq-bank-option {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e1e8ee;
+  border-radius: 6px;
+  color: #172026;
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  justify-items: start;
+  min-height: 42px;
+  padding: 7px 8px 7px 24px;
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+
+.gvq-bank-option::before {
+  background: #c8d2dc;
+  border-radius: 50%;
+  content: "";
+  height: 8px;
+  left: 9px;
+  position: absolute;
+  top: 16px;
+  width: 8px;
+}
+
+.gvq-bank-option:hover {
+  border-color: #9bcfbd;
+  background: #f4fbf8;
+}
+
+.gvq-bank-option-selected {
+  background: #eefaf5;
+  border-color: #0a8f66;
+}
+
+.gvq-bank-option-selected::before {
+  background: #0a8f66;
+}
+
+.gvq-bank-option-title {
+  color: #101820;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gvq-bank-option-meta {
+  color: #586977;
+  display: block;
+  font-size: 11px;
+  line-height: 15px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .gvq-bank {
   background: #ffffff;
   border: 1px solid #c8d2dc;

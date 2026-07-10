@@ -1201,6 +1201,7 @@
       changeNote: panel.querySelector(".gvq-change-note"),
       branchLabel: panel.querySelector(".gvq-branch-label"),
       branchPicker: panel.querySelector(".gvq-branch-picker"),
+      bankOptions: panel.querySelector(".gvq-bank-options"),
       toggleBranch: panel.querySelector(".gvq-branch-toggle")
     };
 
@@ -1243,42 +1244,60 @@
       state.elements.toggleBranch.addEventListener("click", function () {
         var picker = panel.querySelector(".gvq-branch-picker");
         var toggle = panel.querySelector(".gvq-branch-toggle");
-        var select = panel.querySelector(".gvq-bank");
+        var firstOption = panel.querySelector(".gvq-bank-option:not(:disabled)");
         var shouldOpen = picker.hasAttribute("hidden");
 
         picker.toggleAttribute("hidden", !shouldOpen);
         toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
 
-        if (shouldOpen && select && !select.disabled) {
-          select.focus();
+        if (shouldOpen && firstOption) {
+          firstOption.focus();
         }
       });
 
       state.elements.bank.addEventListener("change", function (event) {
-        var select = event.currentTarget;
-        var picker = panel.querySelector(".gvq-branch-picker");
-        var toggle = panel.querySelector(".gvq-branch-toggle");
-        var selectedBranchId = select.value || "";
+        selectBranchBank(event.currentTarget.value || "", panel);
+      });
 
-        state.settings.selectedBranchId = selectedBranchId;
-        state.settings.selectedBankId = selectedBranchId;
-        updateBranchLabel();
-        picker.setAttribute("hidden", "");
-        toggle.setAttribute("aria-expanded", "false");
+      state.elements.bankOptions.addEventListener("click", function (event) {
+        var option = event.target instanceof Element ? event.target.closest(".gvq-bank-option") : null;
+        if (!option || option.disabled) {
+          return;
+        }
 
-        refreshQrForSelectedBranch({ force: true });
-
-        storageSet("sync", state.settings).then(function () {
-          refreshQrForSelectedBranch({ force: true });
-        });
+        selectBranchBank(option.dataset.bankId || "", panel);
       });
     }
+  }
+
+  function selectBranchBank(selectedBranchId, panel) {
+    var picker = panel.querySelector(".gvq-branch-picker");
+    var toggle = panel.querySelector(".gvq-branch-toggle");
+    var select = panel.querySelector(".gvq-bank");
+
+    state.settings.selectedBranchId = selectedBranchId;
+    state.settings.selectedBankId = selectedBranchId;
+
+    if (select) {
+      select.value = selectedBranchId;
+    }
+
+    updateBranchLabel();
+    renderBranchOptions(getBanksForCurrentBranch(), selectedBranchId, getCurrentMshopkeeperBranchFilter());
+    picker.setAttribute("hidden", "");
+    toggle.setAttribute("aria-expanded", "false");
+
+    refreshQrForSelectedBranch({ force: true });
+
+    storageSet("sync", state.settings).then(function () {
+      refreshQrForSelectedBranch({ force: true });
+    });
   }
 
   function ensureEmbeddedPanel(scope) {
     var panel = scope.querySelector(":scope > ." + PANEL_CLASS);
     if (panel) {
-      if (panel.querySelector(".gvq-branch-panel")) {
+      if (panel.querySelector(".gvq-branch-panel") && panel.querySelector(".gvq-bank-options")) {
         return panel;
       }
 
@@ -1316,7 +1335,8 @@
       '      <button class="gvq-branch-toggle" type="button" aria-expanded="false">Thay đổi</button>',
       '    </div>',
       '    <div class="gvq-branch-picker" hidden>',
-      '      <select class="gvq-bank" aria-label="Chọn chi nhánh nhận tiền"></select>',
+      '      <div class="gvq-bank-options" role="listbox" aria-label="Chọn chi nhánh nhận tiền"></div>',
+      '      <select class="gvq-bank gvq-hidden-control" aria-hidden="true" tabindex="-1"></select>',
       '    </div>',
       '  </div>',
       '  <div class="gvq-bank-info gvq-hidden-control"></div>',
@@ -1590,6 +1610,7 @@
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = "--";
       state.elements.noteWarningCode.textContent = "--";
+      renderBranchOptions(banks, "", branchFilter, emptyOption.textContent);
       clearQrDisplay();
       setStatus("", "");
       return;
@@ -1620,6 +1641,7 @@
     select.disabled = false;
     state.elements.changeNote.disabled = !hasSelectedBank;
     state.elements.toggleBranch.disabled = false;
+    renderBranchOptions(banks, select.value, branchFilter);
     updateBranchLabel();
     renderBankInfo();
 
@@ -1636,6 +1658,56 @@
         state.elements.noteText.textContent = existingNote;
       }
     }
+  }
+
+  function renderBranchOptions(banks, selectedBankId, branchFilter, emptyMessage) {
+    var list = state.elements.bankOptions;
+    if (!list) {
+      return;
+    }
+
+    list.textContent = "";
+
+    if (branchFilter && branchFilter.displayName) {
+      var filterLabel = document.createElement("div");
+      filterLabel.className = "gvq-bank-filter";
+      filterLabel.textContent = branchFilter.displayName;
+      list.appendChild(filterLabel);
+    }
+
+    if (!banks.length) {
+      var empty = document.createElement("div");
+      empty.className = "gvq-bank-empty";
+      empty.textContent = emptyMessage || "Không có chi nhánh phù hợp";
+      list.appendChild(empty);
+      return;
+    }
+
+    banks.forEach(function (bank) {
+      var option = document.createElement("button");
+      var selected = bank.id === selectedBankId;
+      option.type = "button";
+      option.className = "gvq-bank-option" + (selected ? " gvq-bank-option-selected" : "");
+      option.dataset.bankId = bank.id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", selected ? "true" : "false");
+
+      var title = document.createElement("span");
+      title.className = "gvq-bank-option-title";
+      title.textContent = bank.branchName || bank.label || "Chi nhánh";
+
+      var meta = document.createElement("span");
+      meta.className = "gvq-bank-option-meta";
+      meta.textContent = [
+        bank.bankName || bank.bankId || "",
+        bank.accountNo || "",
+        bank.accountName || ""
+      ].filter(Boolean).join(" - ");
+
+      option.appendChild(title);
+      option.appendChild(meta);
+      list.appendChild(option);
+    });
   }
 
   function renderBankInfo() {

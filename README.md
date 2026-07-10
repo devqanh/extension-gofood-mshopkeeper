@@ -14,7 +14,7 @@ Tạo file ZIP chỉ chứa mã extension cần upload:
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.23.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.24.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
@@ -51,7 +51,7 @@ POST /api/transactions/sync
 2. Khi khung thanh toán xuất hiện, nếu đã chọn chi nhánh nhận tiền, extension tự sinh ghi chú chuyển khoản, tự điền vào ô `Ghi chú ...`, và tự hiện QR trong khung thanh toán của tab đang mở.
 3. Extension chỉ hiện QR khi có phương thức `Chuyển khoản` và lấy đúng số tiền ở dòng chuyển khoản. Nếu chỉ có `Tiền mặt` hoặc phương thức khác, QR sẽ tự ẩn.
 4. Trong block QR chỉ có ảnh QR và nút `Đổi nội dung`.
-5. Bên dưới QR có dòng chi nhánh hiện tại; bấm `Thay đổi` để mở select chọn chi nhánh, QR sẽ tự tạo lại theo chi nhánh vừa chọn.
+5. Bên dưới QR có dòng chi nhánh hiện tại; bấm `Thay đổi` để mở danh sách tài khoản ngân hàng dạng menu, QR sẽ tự tạo lại theo chi nhánh vừa chọn.
 
 Extension đọc tên chi nhánh MShopKeeper từ `.branch-name`, bỏ tiền tố `Gofood`, đưa về chữ thường, rồi chỉ hiển thị các tài khoản ngân hàng có tên chi nhánh khớp trong nút `Thay đổi`.
 

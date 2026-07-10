@@ -885,6 +885,10 @@
     window.setTimeout(scheduleAutoNoteForActiveScope, 600);
     window.setTimeout(scheduleAutoNoteForActiveScope, 1500);
 
+    ["pointerup", "click"].forEach(function (eventName) {
+      document.addEventListener(eventName, handlePaymentMethodOptionCommit, true);
+    });
+
     document.addEventListener("focusin", function (event) {
       var target = event.target;
       if (!(target instanceof Element)) {
@@ -936,6 +940,35 @@
     });
   }
 
+  function handlePaymentMethodOptionCommit(event) {
+    var target = event.target;
+    if (!(target instanceof Element) || target.closest("." + PANEL_CLASS)) {
+      return;
+    }
+
+    if (!isPaymentMethodOptionElement(target)) {
+      return;
+    }
+
+    var scope = findPaymentScope({ ignoreLast: true });
+    if (scope) {
+      state.lastInteractedScope = scope;
+    }
+
+    schedulePaymentMethodRefresh();
+  }
+
+  function schedulePaymentMethodRefresh() {
+    window.clearTimeout(state.autoNoteTimer);
+    [60, 180, 420].forEach(function (delay) {
+      window.setTimeout(function () {
+        if (!isEditingPaymentAmountInput()) {
+          autoFillNoteForActiveScope({ ignoreEditing: true });
+        }
+      }, delay);
+    });
+  }
+
   function handlePaymentValueChange(event) {
     var target = event.target;
     if (!(target instanceof Element) || target.closest("." + PANEL_CLASS)) {
@@ -964,6 +997,23 @@
     return Boolean(element.closest(".type-payment-wrap, .type-payment-item"));
   }
 
+  function isPaymentMethodOptionElement(element) {
+    var option = element.closest(".q-menu [role='option'], .q-menu .q-item, [role='listbox'] [role='option'], .q-virtual-scroll__content .q-item");
+    if (!option) {
+      return false;
+    }
+
+    var optionText = normalizeText(option.textContent || "");
+    return optionText === "chuyen khoan"
+      || optionText === "tien mat"
+      || optionText === "atm"
+      || optionText === "visa"
+      || optionText === "mastercard"
+      || optionText === "visa debit"
+      || optionText.indexOf("the") >= 0
+      || optionText.indexOf("card") >= 0;
+  }
+
   function isSystemPaymentEditControl(element) {
     if (!(element instanceof Element) || element.closest("." + PANEL_CLASS)) {
       return false;
@@ -980,6 +1030,15 @@
   function isEditingSystemPaymentControl() {
     return document.activeElement instanceof Element
       && isSystemPaymentEditControl(document.activeElement);
+  }
+
+  function isEditingPaymentAmountInput() {
+    var active = document.activeElement;
+    if (!(active instanceof Element) || !active.closest(".type-payment-wrap, .type-payment-item")) {
+      return false;
+    }
+
+    return active.matches("input[maxlength='14'], .misa-input-money input, .input-text-right input, input.text-right");
   }
 
   function isRelevantPaymentMutation(mutation) {
@@ -1028,9 +1087,9 @@
     state.autoNoteTimer = window.setTimeout(autoFillNoteForActiveScope, 160);
   }
 
-  function autoFillNoteForActiveScope() {
+  function autoFillNoteForActiveScope(options) {
     Promise.resolve().then(function () {
-      if (isEditingSystemPaymentControl()) {
+      if (!(options && options.ignoreEditing) && isEditingSystemPaymentControl()) {
         return;
       }
 

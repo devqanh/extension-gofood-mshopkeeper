@@ -1566,19 +1566,27 @@
     }
 
     var select = state.elements.bank;
-    var banks = getBanks();
+    var allBanks = getBanks();
+    var branchFilter = getCurrentMshopkeeperBranchFilter();
+    var banks = getBanksForCurrentBranch();
     select.textContent = "";
 
     if (!banks.length) {
       var emptyOption = document.createElement("option");
       emptyOption.value = "";
-      emptyOption.textContent = "Chưa có cấu hình ngân hàng";
+      emptyOption.textContent = allBanks.length && branchFilter.displayName
+        ? "Không có ngân hàng khớp " + branchFilter.displayName
+        : "Chưa có cấu hình ngân hàng";
       select.appendChild(emptyOption);
       select.disabled = true;
       state.elements.changeNote.disabled = true;
-      state.elements.toggleBranch.disabled = true;
-      state.elements.bankInfo.textContent = "Không đọc được danh sách chi nhánh từ " + getApiBaseUrl() + ".";
-      state.elements.branchLabel.textContent = "Chưa có chi nhánh";
+      state.elements.toggleBranch.disabled = !allBanks.length;
+      state.elements.bankInfo.textContent = allBanks.length && branchFilter.displayName
+        ? "Không tìm thấy tài khoản ngân hàng cho chi nhánh " + branchFilter.displayName + "."
+        : "Không đọc được danh sách chi nhánh từ " + getApiBaseUrl() + ".";
+      state.elements.branchLabel.textContent = allBanks.length && branchFilter.displayName
+        ? "Chưa có chi nhánh khớp " + branchFilter.displayName
+        : "Chưa có chi nhánh";
       state.elements.amountText.textContent = "--";
       state.elements.noteText.textContent = "--";
       state.elements.noteWarningCode.textContent = "--";
@@ -1589,7 +1597,9 @@
 
     var placeholderOption = document.createElement("option");
     placeholderOption.value = "";
-    placeholderOption.textContent = "Chọn chi nhánh nhận tiền";
+    placeholderOption.textContent = branchFilter.displayName
+      ? "Chọn ngân hàng cho " + branchFilter.displayName
+      : "Chọn chi nhánh nhận tiền";
     select.appendChild(placeholderOption);
 
     banks.forEach(function (bank) {
@@ -2288,11 +2298,48 @@
     return state.config && Array.isArray(state.config.banks) ? state.config.banks : [];
   }
 
+  function getBanksForCurrentBranch() {
+    var banks = getBanks();
+    var branchFilter = getCurrentMshopkeeperBranchFilter();
+    if (!branchFilter.key) {
+      return banks;
+    }
+
+    return banks.filter(function (bank) {
+      var haystack = normalizeText([
+        bank.branchName || "",
+        bank.label || ""
+      ].join(" "));
+
+      return haystack.indexOf(branchFilter.key) >= 0;
+    });
+  }
+
+  function getCurrentMshopkeeperBranchFilter() {
+    var branchElement = Array.prototype.slice.call(document.querySelectorAll(".branch-name"))
+      .filter(isVisible)
+      .sort(function (a, b) {
+        return visibleScore(b) - visibleScore(a);
+      })[0];
+    var rawName = branchElement ? String(branchElement.textContent || "").trim() : "";
+    var displayName = rawName
+      .replace(/\bgofood\b/ig, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLocaleLowerCase("vi-VN");
+
+    return {
+      rawName: rawName,
+      displayName: displayName,
+      key: normalizeText(displayName)
+    };
+  }
+
   function getSelectedBank() {
     var selectedId = state.elements.bank && state.elements.bank.value
       ? state.elements.bank.value
       : (state.settings.selectedBranchId || state.settings.selectedBankId);
-    return getBanks().find(function (bank) {
+    return getBanksForCurrentBranch().find(function (bank) {
       return bank.id === selectedId;
     }) || null;
   }

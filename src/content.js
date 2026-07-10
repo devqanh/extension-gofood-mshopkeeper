@@ -989,7 +989,7 @@
     if (isSystemPaymentEditControl(target)) {
       window.clearTimeout(state.autoNoteTimer);
       if (isBankTransferAmountInput(target)) {
-        schedulePaymentAmountRefresh(scope);
+        schedulePaymentAmountRefresh(target, scope);
       }
       return;
     }
@@ -997,16 +997,59 @@
     scheduleAutoNoteForActiveScope();
   }
 
-  function schedulePaymentAmountRefresh(scope) {
+  function schedulePaymentAmountRefresh(input, scope) {
     window.clearTimeout(state.paymentAmountTimer);
     state.paymentAmountTimer = window.setTimeout(function () {
-      if (scope && document.documentElement.contains(scope)) {
-        state.lastInteractedScope = scope;
-        state.activeScope = scope;
-      }
-
-      autoFillNoteForActiveScope({ ignoreEditing: true });
+      renderQrPreviewForTransferAmountInput(input, scope);
     }, 520);
+  }
+
+  function renderQrPreviewForTransferAmountInput(input, scope) {
+    if (!(input instanceof Element) || !document.documentElement.contains(input)) {
+      return;
+    }
+
+    var activeScope = getUsableScope(scope) || findPaymentScopeFromElement(input) || findPaymentScope({ ignoreLast: true });
+    if (!activeScope) {
+      return;
+    }
+
+    state.activeScope = activeScope;
+    state.lastInteractedScope = activeScope;
+    activateEmbeddedPanel(activeScope);
+    renderConfig();
+
+    var bank = getSelectedBank();
+    if (!bank || !isBankTransferAmountInput(input)) {
+      clearQrDisplay();
+      return;
+    }
+
+    var amount = normalizeAmount(input.value || input.getAttribute("value") || "");
+    if (!amount || !isValidQrAmount(amount)) {
+      clearQrDisplay();
+      return;
+    }
+
+    var noteSource = getExistingTransferNote(activeScope)
+      || state.elements.panel.dataset.gvqNote
+      || state.elements.note.value
+      || buildTransferNote();
+    var note = getCanonicalTransferNote(noteSource) || sanitizeTransferNote(noteSource) || buildTransferNote();
+    var qrUrl = buildVietQrUrl(bank, amount, note);
+
+    state.elements.panel.dataset.gvqNote = note;
+    state.elements.panel.dataset.gvqAmount = amount;
+    state.elements.note.value = note;
+    state.elements.amount.value = formatAmount(amount);
+    state.elements.amountText.textContent = formatAmount(amount);
+    state.elements.noteText.textContent = note;
+    state.elements.noteWarningCode.textContent = note;
+    state.elements.noteWarning.classList.add("gvq-show");
+    state.elements.qrImg.src = qrUrl;
+    state.elements.qrLink.href = qrUrl;
+    state.elements.qrWrap.classList.add("gvq-show");
+    setStatus("", "");
   }
 
   function isPaymentValueElement(element) {

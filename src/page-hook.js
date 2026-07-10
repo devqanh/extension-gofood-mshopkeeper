@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var HOOK_FLAG = "__gofoodVietqrSaveSyncHookInstalled";
+  var HOOK_FLAG = "__gofoodVietqrInvoiceRefHookInstalled";
   var MESSAGE_SOURCE = "gofood-vietqr-page-hook";
   var MESSAGE_TYPE = "GOFOOD_VIETQR_SAVE_SYNC_RESPONSE";
 
@@ -32,7 +32,7 @@
     window.fetch = function () {
       var args = Array.prototype.slice.call(arguments);
       var request = getFetchRequest(args[0], args[1]);
-      var shouldCapture = isSaveSyncUrl(request.url);
+      var shouldCapture = shouldCaptureInvoiceRefRequest(request);
 
       return nativeFetch.apply(this, args).then(function (response) {
         if (shouldCapture) {
@@ -66,7 +66,7 @@
       var xhr = this;
       var request = xhr.__gofoodVietqrRequest;
 
-      if (request && isSaveSyncUrl(request.url)) {
+      if (request && shouldCaptureInvoiceRefRequest(request)) {
         xhr.addEventListener("loadend", function () {
           captureXhrResponse(xhr, request);
         });
@@ -142,6 +142,10 @@
 
   function emitResponse(payload) {
     payload.bodyJson = parseJson(payload.bodyText);
+    if (!extractInvoiceRefNo(payload.bodyJson)) {
+      return;
+    }
+
     payload.capturedAt = new Date().toISOString();
 
     window.postMessage({
@@ -176,15 +180,33 @@
     }
   }
 
-  function isSaveSyncUrl(url) {
+  function shouldCaptureInvoiceRefRequest(request) {
+    var method = String(request && request.method || "GET").toUpperCase();
+    if (method === "GET" || method === "HEAD") {
+      return false;
+    }
+
+    return isInvoiceRefCandidateUrl(request && request.url);
+  }
+
+  function isInvoiceRefCandidateUrl(url) {
     var normalized = normalizeUrl(url).toLowerCase();
 
     try {
       var parsed = new URL(normalized);
-      return parsed.pathname === "/salecloud/uploadg2/sainvoice/save-sync";
+      return parsed.pathname.indexOf("/salecloud/uploadg2/sainvoice/") === 0;
     } catch (error) {
-      return normalized.indexOf("/salecloud/uploadg2/sainvoice/save-sync") >= 0;
+      return normalized.indexOf("/salecloud/uploadg2/sainvoice/") >= 0;
     }
+  }
+
+  function extractInvoiceRefNo(json) {
+    if (!json || typeof json !== "object") {
+      return "";
+    }
+
+    var data = json.Data || json.data || {};
+    return String(data.RefNo || data.refNo || data.ref_no || "").trim();
   }
 
   function parseJson(text) {

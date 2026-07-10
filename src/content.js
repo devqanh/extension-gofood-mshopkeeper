@@ -27,6 +27,7 @@
     lastNoteEpochSecond: 0,
     lastSaveSyncResponse: null,
     lastInvoiceRefSaveKey: "",
+    pendingTransactionContext: null,
     lastBranchRefreshId: "",
     lastBranchRefreshAt: 0,
     elements: {}
@@ -224,7 +225,7 @@
     });
 
     if (window.console && typeof window.console.info === "function") {
-      window.console.info("[GoFood VietQR] Bắt response save-sync:", response);
+      window.console.info("[GoFood VietQR] Bắt response hóa đơn:", response);
     }
   }
 
@@ -276,8 +277,8 @@
     if (state.elements.status) {
       setStatus(
         response.refNo
-          ? "Đã bắt response lưu tạm: " + response.refNo
-          : "Đã bắt response lưu tạm.",
+          ? "Đã bắt response hóa đơn: " + response.refNo
+          : "Đã bắt response hóa đơn.",
         response.success ? "ok" : "error"
       );
     }
@@ -289,7 +290,9 @@
     }
 
     var endpoint = getApiUrl("/api/transactions/sync");
-    var transferNote = detectCurrentTransferNote();
+    var pendingContext = getRecentPendingTransactionContext();
+    var transferNote = detectCurrentTransferNote()
+      || (pendingContext ? pendingContext.transferNote : "");
 
     if (!response.refNo || !transferNote || !endpoint) {
       if (state.elements.status && response.refNo && !transferNote) {
@@ -299,6 +302,13 @@
     }
 
     var paymentSnapshot = buildPaymentSnapshot();
+    if ((!paymentSnapshot || !paymentSnapshot.bankTransferAmount)
+      && pendingContext
+      && pendingContext.paymentSnapshot
+      && pendingContext.paymentSnapshot.bankTransferAmount) {
+      paymentSnapshot = pendingContext.paymentSnapshot;
+    }
+
     if (!paymentSnapshot.bankTransferAmount) {
       if (state.elements.status) {
         setStatus("Không gửi RefNo vì hóa đơn không có số tiền Chuyển khoản.", "");
@@ -306,7 +316,7 @@
       return;
     }
 
-    var selectedBank = getSelectedBank();
+    var selectedBank = getSelectedBank() || (pendingContext ? pendingContext.selectedBank : null);
     var saveKey = response.refNo + "|" + transferNote;
 
     if (saveKey === state.lastInvoiceRefSaveKey) {
@@ -330,6 +340,7 @@
       paymentTotalText: paymentSnapshot.paymentTotalText,
       paymentMethods: paymentSnapshot.paymentMethods,
       paymentsByType: paymentSnapshot.paymentsByType,
+      transactionAction: pendingContext ? pendingContext.reason || "" : "",
       branchId: selectedBank ? selectedBank.branchId || selectedBank.id : "",
       branchName: selectedBank ? selectedBank.branchName || selectedBank.label : "",
       transferPrefix: selectedBank ? selectedBank.transferPrefix || getTransferNotePrefix() : getTransferNotePrefix(),
@@ -368,6 +379,8 @@
       if (state.elements.status) {
         setStatus("Đã gửi API RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
       }
+
+      state.pendingTransactionContext = null;
     }).catch(function (error) {
       state.lastInvoiceRefSaveKey = "";
       if (state.elements.status) {
@@ -519,8 +532,11 @@
     return detectAmountFromPage();
   }
 
-  function buildPaymentSnapshot() {
-    var scope = getUsableScope(state.activeScope) || findPaymentScope({ ignoreLast: true }) || document;
+  function buildPaymentSnapshot(scopeOverride) {
+    var scope = getUsableScope(scopeOverride)
+      || getUsableScope(state.activeScope)
+      || findPaymentScope({ ignoreLast: true })
+      || document;
     var receivableAmount = detectReceivableAmountFromPage(scope) || detectCurrentAmount();
     var paymentMethods = detectPaymentMethods(scope);
     var summary = summarizePaymentMethods(paymentMethods);
@@ -537,6 +553,45 @@
       paymentMethods: paymentMethods,
       paymentsByType: summary.paymentsByType
     };
+  }
+
+  function capturePendingTransactionContext(reason, scopeOverride) {
+    if (!state.privacyConsentAccepted) {
+      return;
+    }
+
+    var scope = getUsableScope(scopeOverride)
+      || getUsableScope(state.activeScope)
+      || getUsableScope(state.lastInteractedScope)
+      || findPaymentScope({ ignoreLast: true });
+    var paymentSnapshot = buildPaymentSnapshot(scope);
+    var transferNote = detectCurrentTransferNote();
+
+    if (!transferNote && scope) {
+      transferNote = getExistingTransferNote(scope);
+    }
+
+    if (!transferNote || !paymentSnapshot.bankTransferAmount) {
+      state.pendingTransactionContext = null;
+      return;
+    }
+
+    state.pendingTransactionContext = {
+      reason: reason || "",
+      capturedAtMs: Date.now(),
+      transferNote: transferNote,
+      paymentSnapshot: paymentSnapshot,
+      selectedBank: getSelectedBank()
+    };
+  }
+
+  function getRecentPendingTransactionContext() {
+    var context = state.pendingTransactionContext;
+    if (!context || Date.now() - Number(context.capturedAtMs || 0) > 10 * 60 * 1000) {
+      return null;
+    }
+
+    return context;
   }
 
   function detectPaymentMethods(scope) {
@@ -701,6 +756,7 @@
   }
 
   function clearQrWhenNoTransfer(scope) {
+    state.pendingTransactionContext = null;
     clearGeneratedSiteNote(scope || getActiveScope());
     clearQrDisplay();
     setStatus("Chỉ hiện QR khi có phương thức Chuyển khoản và số tiền chuyển khoản lớn hơn 0.", "");
@@ -739,10 +795,31 @@
   }
 
   function bindOrderChangeCleanup() {
+    document.addEventListener("pointerdown", function (event) {
+      var target = event.target;
+      if (!(target instanceof Element) || !isTransactionSubmitClick(target)) {
+        return;
+      }
+
+      capturePendingTransactionContext("button", findPaymentScopeFromElement(target));
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "F9" && event.key !== "F10") {
+        return;
+      }
+
+      capturePendingTransactionContext(event.key, findPaymentScope());
+    }, true);
+
     document.addEventListener("click", function (event) {
       var target = event.target;
       if (!(target instanceof Element)) {
         return;
+      }
+
+      if (isTransactionSubmitClick(target)) {
+        capturePendingTransactionContext("click", findPaymentScopeFromElement(target));
       }
 
       if (isInvoiceTabClick(target)) {
@@ -767,6 +844,29 @@
       window.setTimeout(scheduleAutoNoteForActiveScope, 120);
       window.setTimeout(scheduleAutoNoteForActiveScope, 500);
     }, true);
+  }
+
+  function isTransactionSubmitClick(target) {
+    var button = target.closest("button, .q-btn, [role='button']");
+    if (!button) {
+      return false;
+    }
+
+    if (button.classList && button.classList.contains("btn-save-order")) {
+      return true;
+    }
+
+    var text = normalizeText([
+      button.textContent || "",
+      button.getAttribute("name") || "",
+      button.getAttribute("class") || ""
+    ].join(" "));
+
+    return text.indexOf("thu tien") >= 0
+      || text.indexOf("luu tam") >= 0
+      || text.indexOf("thanh toan") >= 0
+      || text.indexOf("save order btn") >= 0
+      || text.indexOf("btn save order") >= 0;
   }
 
   function bindAutoNoteGeneration() {

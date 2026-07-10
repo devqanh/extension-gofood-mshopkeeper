@@ -14,7 +14,7 @@ Tạo file ZIP chỉ chứa mã extension cần upload:
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.18.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.19.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
@@ -35,7 +35,7 @@ POST /api/transactions/sync
 
 `GET /api/branches` trả danh sách chi nhánh gồm `id`, `name`, `bank_bin`, `bank_name`, `account_name`, `account_number`, `transfer_prefix`. Extension dùng dữ liệu này để chọn chi nhánh, tạo QR VietQR và sinh prefix nội dung chuyển khoản.
 
-`POST /api/transactions/sync` nhận payload sau khi MShopKeeper trả `Data.RefNo` từ endpoint `save-sync`.
+`POST /api/transactions/sync` nhận payload sau khi MShopKeeper trả `Data.RefNo` từ các endpoint hóa đơn `SAInvoice` như `save-sync` hoặc luồng `Thu tiền`.
 
 ## Cài extension
 
@@ -49,7 +49,7 @@ POST /api/transactions/sync
 
 1. Mở một site bán hàng thuộc `*.mshopkeeper.vn`.
 2. Khi khung thanh toán xuất hiện, nếu đã chọn chi nhánh nhận tiền, extension tự sinh ghi chú chuyển khoản, tự điền vào ô `Ghi chú ...`, và tự hiện QR trong khung thanh toán của tab đang mở.
-3. Extension sẽ ưu tiên lấy số tiền từ dòng `Còn phải thu`, ví dụ `545,000`.
+3. Extension chỉ hiện QR khi có phương thức `Chuyển khoản` và lấy đúng số tiền ở dòng chuyển khoản. Nếu chỉ có `Tiền mặt` hoặc phương thức khác, QR sẽ tự ẩn.
 4. Trong block QR chỉ có ảnh QR và nút `Đổi nội dung`.
 5. Bên dưới QR có dòng chi nhánh hiện tại; bấm `Thay đổi` để mở select chọn chi nhánh, QR sẽ tự tạo lại theo chi nhánh vừa chọn.
 
@@ -59,7 +59,7 @@ Extension sẽ:
 
 - Tạo nội dung chuyển khoản dạng `GOFOODYYMMDDHHMMSS`, ví dụ `GOFOOD260708133911`.
 - Tự điền nội dung chuyển khoản và tự hiện QR khi load trang, khi đổi tab hóa đơn, hoặc khi thêm order mới.
-- Lấy số tiền từ dòng `Còn phải thu` trong tab bán hàng hiện tại.
+- Lấy số tiền từ dòng `Chuyển khoản` trong tab bán hàng hiện tại; nếu hóa đơn không có chuyển khoản thì không hiện QR và không gửi RefNo về API.
 - Fill nội dung đó vào textarea có placeholder `Ghi chú ...`.
 - Hiện ảnh QR từ Quick Link của VietQR ngay trong div thanh toán `.overflow-auto.flex-1`.
 
@@ -72,17 +72,17 @@ Nếu người dùng nhập thêm nội dung sau mã chuẩn, ví dụ `GOFOOD26
 Để tránh trùng mã khi tạo nhiều hóa đơn quá nhanh, nếu mã `YYMMDDHHMMSS` hiện tại đã được dùng trong các ô ghi chú đang mở hoặc trong phiên hiện tại, extension tự nhích sang giây kế tiếp chưa dùng.
 Block QR có thêm dòng lưu ý không xoá mã chuyển khoản trong mục ghi chú để kế toán tra soát dữ liệu.
 
-## Bắt response lưu tạm
+## Bắt response hóa đơn
 
-Extension inject `src/page-hook.js` vào page context để bắt response của endpoint:
+Extension inject `src/page-hook.js` vào page context để bắt response của các endpoint hóa đơn:
 
 ```text
-/SAInvoice/save-sync
+/SAInvoice/*
 ```
 
-Khi hệ thống gọi API này, ví dụ sau khi bấm `Lưu tạm (F10)`, extension đọc được JSON response như `Code`, `Success`, `Data.RefNo`. Response cuối cùng được lưu vào `chrome.storage.local.lastSaveSyncResponse`, đồng thời log ra Console với prefix `[GoFood VietQR]`.
+Khi hệ thống gọi API này, ví dụ sau khi bấm `Lưu tạm (F10)` hoặc `Thu tiền (F9)`, nếu JSON response có `Data.RefNo` thì extension mới xử lý. Response cuối cùng được lưu vào `chrome.storage.local.lastSaveSyncResponse`, đồng thời log ra Console với prefix `[GoFood VietQR]`.
 
-Từ bản `1.0.2`, extension bắt đúng endpoint:
+Extension vẫn hỗ trợ endpoint:
 
 ```text
 /salecloud/uploadg2/SAInvoice/save-sync

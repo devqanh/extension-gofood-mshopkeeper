@@ -294,26 +294,19 @@
     var transferNote = detectCurrentTransferNote()
       || (pendingContext ? pendingContext.transferNote : "");
 
-    if (!response.refNo || !transferNote || !endpoint) {
-      if (state.elements.status && response.refNo && !transferNote) {
-        setStatus("Đã bắt RefNo nhưng chưa tìm thấy mã GOFOOD trong ghi chú.", "error");
-      }
+    if (!response.refNo || !endpoint) {
       return;
     }
 
     var paymentSnapshot = buildPaymentSnapshot();
-    if ((!paymentSnapshot || !paymentSnapshot.bankTransferAmount)
+    if ((!paymentSnapshot || !hasPaymentSnapshotData(paymentSnapshot))
       && pendingContext
-      && pendingContext.paymentSnapshot
-      && pendingContext.paymentSnapshot.bankTransferAmount) {
+      && pendingContext.paymentSnapshot) {
       paymentSnapshot = pendingContext.paymentSnapshot;
     }
 
     if (!paymentSnapshot.bankTransferAmount) {
-      if (state.elements.status) {
-        setStatus("Không gửi RefNo vì hóa đơn không có số tiền Chuyển khoản.", "");
-      }
-      return;
+      transferNote = "";
     }
 
     var selectedBank = getSelectedBank() || (pendingContext ? pendingContext.selectedBank : null);
@@ -343,7 +336,7 @@
       transactionAction: pendingContext ? pendingContext.reason || "" : "",
       branchId: selectedBank ? selectedBank.branchId || selectedBank.id : "",
       branchName: selectedBank ? selectedBank.branchName || selectedBank.label : "",
-      transferPrefix: selectedBank ? selectedBank.transferPrefix || getTransferNotePrefix() : getTransferNotePrefix(),
+      transferPrefix: transferNote ? (selectedBank ? selectedBank.transferPrefix || getTransferNotePrefix() : getTransferNotePrefix()) : "",
       bankId: selectedBank ? selectedBank.bankId : "",
       bankName: selectedBank ? selectedBank.bankName || "" : "",
       bankAccountNo: selectedBank ? selectedBank.accountNo : "",
@@ -377,7 +370,12 @@
       });
 
       if (state.elements.status) {
-        setStatus("Đã gửi API RefNo " + response.refNo + " cho " + transferNote + ".", "ok");
+        setStatus(
+          transferNote
+            ? "Đã gửi API RefNo " + response.refNo + " cho " + transferNote + "."
+            : "Đã gửi API RefNo " + response.refNo + ".",
+          "ok"
+        );
       }
 
       state.pendingTransactionContext = null;
@@ -571,7 +569,7 @@
       transferNote = getExistingTransferNote(scope);
     }
 
-    if (!transferNote || !paymentSnapshot.bankTransferAmount) {
+    if (!transferNote && !hasPaymentSnapshotData(paymentSnapshot)) {
       state.pendingTransactionContext = null;
       return;
     }
@@ -592,6 +590,19 @@
     }
 
     return context;
+  }
+
+  function hasPaymentSnapshotData(paymentSnapshot) {
+    return Boolean(
+      paymentSnapshot
+      && (
+        paymentSnapshot.receivableAmount
+        || paymentSnapshot.bankTransferAmount
+        || paymentSnapshot.cashAmount
+        || paymentSnapshot.paymentTotal
+        || (paymentSnapshot.paymentMethods && paymentSnapshot.paymentMethods.length)
+      )
+    );
   }
 
   function detectPaymentMethods(scope) {

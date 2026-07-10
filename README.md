@@ -14,7 +14,7 @@ Tạo file ZIP chỉ chứa mã extension cần upload:
 powershell -ExecutionPolicy Bypass -File .\build-store-package.ps1
 ```
 
-File kết quả: `build/gofood-vietqr-helper-1.0.20.zip`.
+File kết quả: `build/gofood-vietqr-helper-1.0.21.zip`.
 
 Endpoint API hiện được cấu hình cố định trong `src/api-config.js`:
 
@@ -59,7 +59,7 @@ Extension sẽ:
 
 - Tạo nội dung chuyển khoản dạng `GOFOODYYMMDDHHMMSS`, ví dụ `GOFOOD260708133911`.
 - Tự điền nội dung chuyển khoản và tự hiện QR khi load trang, khi đổi tab hóa đơn, hoặc khi thêm order mới.
-- Lấy số tiền từ dòng `Chuyển khoản` trong tab bán hàng hiện tại; nếu hóa đơn không có chuyển khoản thì không hiện QR và không gửi RefNo về API.
+- Lấy số tiền từ dòng `Chuyển khoản` trong tab bán hàng hiện tại; nếu hóa đơn không có chuyển khoản thì không hiện QR, nhưng vẫn gửi RefNo và danh sách phương thức thanh toán về API khi MShopKeeper trả `save-sync`.
 - Fill nội dung đó vào textarea có placeholder `Ghi chú ...`.
 - Hiện ảnh QR từ Quick Link của VietQR ngay trong div thanh toán `.overflow-auto.flex-1`.
 
@@ -114,7 +114,7 @@ Extension tự tải danh sách chi nhánh từ:
 GET https://gofood.dewa.vn/api/branches
 ```
 
-Payload gồm `refNo`, `transferNote`, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt, thông tin chi nhánh/ngân hàng và thời điểm post.
+Payload gồm `refNo`, `transferNote` nếu có, `receivableAmount`, các dòng `paymentMethods`, tổng chuyển khoản, tổng tiền mặt, nhóm phương thức khác, thông tin chi nhánh/ngân hàng nếu có và thời điểm post.
 
 ## Ghi chú VietQR
 
